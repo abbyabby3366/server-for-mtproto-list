@@ -122,6 +122,7 @@ app.get('/', (req, res) => {
     endpoints: {
       'GET /proxies': 'Get list of available MTProto proxies',
       'POST /proxies': 'Update proxy list (requires API_KEY)',
+      'GET /transit-ips': 'Get list of active Transit Node IPs',
       'GET /health': 'Health check'
     }
   });
