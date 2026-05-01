@@ -64,6 +64,22 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /transit-ips
+ * Returns a list of active Transit Node IPs from local JSON.
+ */
+app.get('/transit-ips', (req, res) => {
+  try {
+    const ipsPath = path.join(__dirname, 'transit-ips.json');
+    const ipsData = fs.readFileSync(ipsPath, 'utf-8');
+    const ips = JSON.parse(ipsData);
+    res.json(ips);
+  } catch (error) {
+    console.error('Error reading IPs:', error.message);
+    res.status(500).json({ error: 'Failed to load IP list' });
+  }
+});
+
+/**
  * POST /proxies
  * Admin endpoint to update the proxy list.
  * Requires API_KEY to be set.

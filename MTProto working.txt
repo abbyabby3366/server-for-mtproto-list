@@ -1,0 +1,21 @@
+
+
+MTProxy Admin Bot (in telegram): @MTProxybot
+https://t.me/MTProxybot
+
+Follow the instructions there
+https://hub.docker.com/r/telegrammessenger/proxy/
+
+sudo apt-get update
+sudo apt install docker.io
+
+sudo docker run -d -p443:443 --name=mtproto-proxy --restart=always -v proxy-config:/data telegrammessenger/proxy:latest
+
+sudo docker logs mtproto-proxy
+
+Copy that proxy tg://proxy... link directly
+Make sure to have port 443 (or other port open)
+
+
+
+NOT WORKING, BUT WORTH LEARNING: https://www.youtube.com/watch?v=Cisw-8kx-Z4
