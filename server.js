@@ -3,13 +3,40 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Connect to MongoDB
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://desmondgiam_db_user:PCibd7pBM4XcOAHG@skywalker-tencent-clust.hr8apyw.mongodb.net/?appName=skywalker-tencent-cluster';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Schemas
+const loginTelemetrySchema = new mongoose.Schema({
+  event: String,
+  timestamp: Date,
+  telegram_user: Object,
+  device_info: Object,
+  network_info: Object,
+  app_context: Object
+});
+const LoginTelemetry = mongoose.model('LoginTelemetry', loginTelemetrySchema);
+
+const networkTelemetrySchema = new mongoose.Schema({
+  user_id: { type: Number, required: true, unique: true },
+  timestamp: Date,
+  network_usage: Object,
+  last_updated: Date
+});
+const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Optional API key authentication
 const apiKeyAuth = (req, res, next) => {
@@ -143,6 +170,57 @@ app.get('/', (req, res) => {
       'GET /health': 'Health check'
     }
   });
+});
+
+/**
+ * POST /user-login-details
+ */
+app.post('/user-login-details', async (req, res) => {
+  try {
+    const payload = req.body;
+    const newRecord = new LoginTelemetry(payload);
+    await newRecord.save();
+    res.status(201).json({ status: 'recorded' });
+  } catch (error) {
+    console.error('Error recording login telemetry:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * POST /network-usage
+ */
+app.post('/network-usage', async (req, res) => {
+  try {
+    const payload = req.body;
+    const { user_id } = payload;
+    if (!user_id) return res.status(400).json({ error: 'user_id required' });
+
+    payload.last_updated = new Date();
+    
+    await NetworkTelemetry.findOneAndUpdate(
+      { user_id },
+      payload,
+      { upsert: true, new: true }
+    );
+    res.status(200).json({ status: 'updated' });
+  } catch (error) {
+    console.error('Error updating network telemetry:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * GET /api/telemetry/stats (for the frontend dashboard)
+ */
+app.get('/api/telemetry/stats', async (req, res) => {
+  try {
+    const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(100);
+    const network = await NetworkTelemetry.find().sort({ last_updated: -1 });
+    res.json({ logins, network });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 app.listen(PORT, () => {

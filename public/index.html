@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TalkPro Telemetry - Logins</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 10px; font-size: 14px; }
+    h2 { color: #2c3e50; margin-top: 0; font-size: 18px; }
+    nav { margin-bottom: 15px; }
+    nav a { text-decoration: none; padding: 6px 12px; background: #2c3e50; color: white; border-radius: 4px; margin-right: 5px; font-weight: 500; }
+    .card { background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f8f9fa; font-weight: 600; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .badge-true { background: #d4edda; color: #155724; }
+    .badge-false { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Recent Logins</a>
+    <a href="/network.html" style="background:#bdc3c7; color:#333;">Network Usage</a>
+  </nav>
+
+  <div class="card">
+    <h2>Recent Logins</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>User</th>
+          <th>Device</th>
+          <th>Android ID</th>
+          <th>Proxy IP</th>
+          <th>VPN?</th>
+        </tr>
+      </thead>
+      <tbody id="logins-body">
+        <tr><td colspan="6">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        const res = await fetch('/api/telemetry/stats');
+        const data = await res.json();
+        const loginsBody = document.getElementById('logins-body');
+        loginsBody.innerHTML = '';
+        if (data.logins.length === 0) {
+          loginsBody.innerHTML = '<tr><td colspan="6">No logins recorded yet.</td></tr>';
+        } else {
+          data.logins.forEach(row => {
+            const tr = document.createElement('tr');
+            const user = row.telegram_user || {};
+            const dev = row.device_info || {};
+            const net = row.network_info || {};
+            tr.innerHTML = `
+              <td>${new Date(row.timestamp).toLocaleString()}</td>
+              <td>${user.first_name || ''} ${user.last_name || ''} <br> <span style="color:#666">${user.phone_number || ''}</span></td>
+              <td>${dev.manufacturer || ''} ${dev.model || ''} <br> <span style="color:#666">Android ${dev.os_version || ''}</span></td>
+              <td>${dev.android_id || 'N/A'} <br> ${dev.is_emulator ? '<span class="badge badge-false">Emulator</span>' : ''}</td>
+              <td>${net.active_proxy_ip || 'N/A'}</td>
+              <td><span class="badge badge-${net.is_using_vpn}">${net.is_using_vpn ? 'YES' : 'NO'}</span></td>
+            `;
+            loginsBody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadData();
+    setInterval(loadData, 10000);
+  </script>
+</body>
+</html>

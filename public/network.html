@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TalkPro Telemetry - Network Usage</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 10px; font-size: 14px; }
+    h2 { color: #2c3e50; margin-top: 0; font-size: 18px; }
+    nav { margin-bottom: 15px; }
+    nav a { text-decoration: none; padding: 6px 12px; background: #2c3e50; color: white; border-radius: 4px; margin-right: 5px; font-weight: 500; }
+    .card { background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f8f9fa; font-weight: 600; }
+    .bytes { font-family: monospace; font-size: 13px; }
+    .sub-text { color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" style="background:#bdc3c7; color:#333;">Recent Logins</a>
+    <a href="/network.html">Network Usage</a>
+  </nav>
+
+  <div class="card">
+    <h2>Network Usage</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>Last Updated</th>
+          <th>Total Sent</th>
+          <th>Total Received</th>
+          <th>Mobile Data</th>
+          <th>WiFi Data</th>
+        </tr>
+      </thead>
+      <tbody id="network-body">
+        <tr><td colspan="6">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    function formatBytes(bytes) {
+      if (bytes === 0 || !bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch('/api/telemetry/stats');
+        const data = await res.json();
+        const netBody = document.getElementById('network-body');
+        netBody.innerHTML = '';
+        if (data.network.length === 0) {
+          netBody.innerHTML = '<tr><td colspan="6">No network data yet.</td></tr>';
+        } else {
+          data.network.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${row.user_id}</td>
+              <td>${new Date(row.last_updated).toLocaleString()}</td>
+              <td class="bytes">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
+              <td class="bytes">${formatBytes(row.network_usage?.total_bytes_received)}</td>
+              <td class="bytes">
+                S: ${formatBytes(row.network_usage?.mobile_bytes_sent)}<br>
+                <span class="sub-text">R: ${formatBytes(row.network_usage?.mobile_bytes_received)}</span>
+              </td>
+              <td class="bytes">
+                S: ${formatBytes(row.network_usage?.wifi_bytes_sent)}<br>
+                <span class="sub-text">R: ${formatBytes(row.network_usage?.wifi_bytes_received)}</span>
+              </td>
+            `;
+            netBody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    loadData();
+    setInterval(loadData, 10000);
+  </script>
+</body>
+</html>
