@@ -15,6 +15,11 @@
     .badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
     .badge-true { background: #d4edda; color: #155724; }
     .badge-false { background: #f8d7da; color: #721c24; }
+    .btn { padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal { background: white; padding: 20px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-close { float: right; cursor: pointer; font-size: 18px; font-weight: bold; color: #999; }
+    pre { background: #f4f7f6; padding: 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -24,7 +29,10 @@
   </nav>
 
   <div class="card">
-    <h2>Recent Logins</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Recent Logins</h2>
+      <button class="btn" style="background:#e74c3c;" onclick="deleteAllLogins()">Delete All</button>
+    </div>
     <table>
       <thead>
         <tr>
@@ -34,36 +42,78 @@
           <th>Android ID</th>
           <th>Proxy IP</th>
           <th>VPN?</th>
+          <th>Details</th>
         </tr>
       </thead>
       <tbody id="logins-body">
-        <tr><td colspan="6">Loading...</td></tr>
+        <tr><td colspan="7">Loading...</td></tr>
       </tbody>
     </table>
   </div>
 
+  <div id="details-modal" class="modal-overlay">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal()">✕</span>
+      <h3 style="margin-top:0;">Full Login Payload</h3>
+      <pre id="modal-content"></pre>
+    </div>
+  </div>
+
   <script>
+    let allLogins = [];
+
+    function showModal(index) {
+      const data = allLogins[index];
+      document.getElementById('modal-content').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('details-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('details-modal').style.display = 'none';
+    }
+
+    async function deleteAllLogins() {
+      if (confirm("Are you sure you want to delete ALL login records? This cannot be undone.")) {
+        try {
+          await fetch('/api/telemetry/logins', { method: 'DELETE' });
+          loadData();
+        } catch (e) {
+          console.error(e);
+          alert('Error deleting records.');
+        }
+      }
+    }
+
     async function loadData() {
       try {
         const res = await fetch('/api/telemetry/stats');
         const data = await res.json();
+        allLogins = data.logins;
+        
         const loginsBody = document.getElementById('logins-body');
         loginsBody.innerHTML = '';
-        if (data.logins.length === 0) {
-          loginsBody.innerHTML = '<tr><td colspan="6">No logins recorded yet.</td></tr>';
+        if (allLogins.length === 0) {
+          loginsBody.innerHTML = '<tr><td colspan="7">No logins recorded yet.</td></tr>';
         } else {
-          data.logins.forEach(row => {
+          allLogins.forEach((row, index) => {
             const tr = document.createElement('tr');
             const user = row.telegram_user || {};
             const dev = row.device_info || {};
             const net = row.network_info || {};
+            
+            // The Android app sends local time but incorrectly appends 'Z' (UTC).
+            // By stripping the 'Z', JavaScript treats it as local time.
+            const rawTimestamp = (row.timestamp || "").replace("Z", "");
+            const timeGmt8 = new Date(rawTimestamp).toLocaleString("en-US", { hour12: true });
+
             tr.innerHTML = `
-              <td>${new Date(row.timestamp).toLocaleString()}</td>
+              <td>${timeGmt8}</td>
               <td>${user.first_name || ''} ${user.last_name || ''} <br> <span style="color:#666">${user.phone_number || ''}</span></td>
               <td>${dev.manufacturer || ''} ${dev.model || ''} <br> <span style="color:#666">Android ${dev.os_version || ''}</span></td>
               <td>${dev.android_id || 'N/A'} <br> ${dev.is_emulator ? '<span class="badge badge-false">Emulator</span>' : ''}</td>
               <td>${net.active_proxy_ip || 'N/A'}</td>
               <td><span class="badge badge-${net.is_using_vpn}">${net.is_using_vpn ? 'YES' : 'NO'}</span></td>
+              <td><button class="btn" onclick="showModal(${index})">View Details</button></td>
             `;
             loginsBody.appendChild(tr);
           });

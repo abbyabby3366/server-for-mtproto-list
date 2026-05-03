@@ -27,6 +27,7 @@ const LoginTelemetry = mongoose.model('LoginTelemetry', loginTelemetrySchema);
 
 const networkTelemetrySchema = new mongoose.Schema({
   user_id: { type: Number, required: true, unique: true },
+  telegram_user: Object,
   timestamp: Date,
   network_usage: Object,
   last_updated: Date
@@ -216,8 +217,55 @@ app.post('/network-usage', async (req, res) => {
 app.get('/api/telemetry/stats', async (req, res) => {
   try {
     const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(100);
-    const network = await NetworkTelemetry.find().sort({ last_updated: -1 });
+    const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).lean();
+    
+    // Attach phone number from latest login to network data
+    const network = await Promise.all(networkRaw.map(async (net) => {
+      let phone = net.telegram_user?.phone_number;
+      let fName = net.telegram_user?.first_name;
+      let lName = net.telegram_user?.last_name;
+      
+      if (!phone && phone !== "") {
+        const userLogin = await LoginTelemetry.findOne({ "telegram_user.user_id": net.user_id }).sort({ timestamp: -1 }).lean();
+        phone = userLogin?.telegram_user?.phone_number || "";
+        fName = userLogin?.telegram_user?.first_name || "Unknown";
+        lName = userLogin?.telegram_user?.last_name || "";
+      }
+      
+      return {
+        ...net,
+        phone_number: phone,
+        first_name: fName || "Unknown",
+        last_name: lName || ""
+      };
+    }));
+    
     res.json({ logins, network });
+  } catch (error) {
+    console.error('Stats Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * DELETE /api/telemetry/logins
+ */
+app.delete('/api/telemetry/logins', async (req, res) => {
+  try {
+    await LoginTelemetry.deleteMany({});
+    res.json({ status: 'deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * DELETE /api/telemetry/network
+ */
+app.delete('/api/telemetry/network', async (req, res) => {
+  try {
+    await NetworkTelemetry.deleteMany({});
+    res.json({ status: 'deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }

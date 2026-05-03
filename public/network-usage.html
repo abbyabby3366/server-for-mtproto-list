@@ -14,6 +14,11 @@
     th { background-color: #f8f9fa; font-weight: 600; }
     .bytes { font-family: monospace; font-size: 13px; }
     .sub-text { color: #666; font-size: 12px; }
+    .btn { padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal { background: white; padding: 20px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .modal-close { float: right; cursor: pointer; font-size: 18px; font-weight: bold; color: #999; }
+    pre { background: #f4f7f6; padding: 10px; border-radius: 4px; font-size: 12px; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -23,25 +28,61 @@
   </nav>
 
   <div class="card">
-    <h2>Network Usage</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Network Usage</h2>
+      <button class="btn" style="background:#e74c3c;" onclick="deleteAllNetwork()">Delete All</button>
+    </div>
     <table>
       <thead>
         <tr>
-          <th>User ID</th>
+          <th>User</th>
           <th>Last Updated</th>
           <th>Total Sent</th>
           <th>Total Received</th>
           <th>Mobile Data</th>
           <th>WiFi Data</th>
+          <th>Details</th>
         </tr>
       </thead>
       <tbody id="network-body">
-        <tr><td colspan="6">Loading...</td></tr>
+        <tr><td colspan="7">Loading...</td></tr>
       </tbody>
     </table>
   </div>
 
+  <div id="details-modal" class="modal-overlay">
+    <div class="modal">
+      <span class="modal-close" onclick="closeModal()">✕</span>
+      <h3 style="margin-top:0;">Full Network Payload</h3>
+      <pre id="modal-content"></pre>
+    </div>
+  </div>
+
   <script>
+    let allNetwork = [];
+
+    function showModal(index) {
+      const data = allNetwork[index];
+      document.getElementById('modal-content').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('details-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('details-modal').style.display = 'none';
+    }
+
+    async function deleteAllNetwork() {
+      if (confirm("Are you sure you want to delete ALL network records? This cannot be undone.")) {
+        try {
+          await fetch('/api/telemetry/network', { method: 'DELETE' });
+          loadData();
+        } catch (e) {
+          console.error(e);
+          alert('Error deleting records.');
+        }
+      }
+    }
+
     function formatBytes(bytes) {
       if (bytes === 0 || !bytes) return '0 B';
       const k = 1024;
@@ -54,15 +95,18 @@
       try {
         const res = await fetch('/api/telemetry/stats');
         const data = await res.json();
+        
+        allNetwork = data.network;
+        
         const netBody = document.getElementById('network-body');
         netBody.innerHTML = '';
-        if (data.network.length === 0) {
-          netBody.innerHTML = '<tr><td colspan="6">No network data yet.</td></tr>';
+        if (allNetwork.length === 0) {
+          netBody.innerHTML = '<tr><td colspan="7">No network data yet.</td></tr>';
         } else {
-          data.network.forEach(row => {
+          allNetwork.forEach((row, index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-              <td>${row.user_id}</td>
+              <td>${row.first_name || 'Unknown'} ${row.last_name || ''} <br> <span style="color:#666">${row.phone_number || row.user_id}</span></td>
               <td>${new Date(row.last_updated).toLocaleString()}</td>
               <td class="bytes">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
               <td class="bytes">${formatBytes(row.network_usage?.total_bytes_received)}</td>
@@ -74,6 +118,7 @@
                 S: ${formatBytes(row.network_usage?.wifi_bytes_sent)}<br>
                 <span class="sub-text">R: ${formatBytes(row.network_usage?.wifi_bytes_received)}</span>
               </td>
+              <td><button class="btn" onclick="showModal(${index})">View Details</button></td>
             `;
             netBody.appendChild(tr);
           });
