@@ -28,6 +28,7 @@ const LoginTelemetry = mongoose.model('LoginTelemetry', loginTelemetrySchema);
 const networkTelemetrySchema = new mongoose.Schema({
   user_id: { type: Number, required: true, unique: true },
   telegram_user: Object,
+  original_ip: String,
   timestamp: Date,
   network_usage: Object,
   last_updated: Date
@@ -179,6 +180,13 @@ app.get('/', (req, res) => {
 app.post('/user-login-details', async (req, res) => {
   try {
     const payload = req.body;
+    
+    // Capture the original IP from the request headers (Render uses x-forwarded-for)
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (payload.network_info) {
+      payload.network_info.original_ip = clientIp ? clientIp.split(',')[0].trim() : 'Unknown';
+    }
+
     const newRecord = new LoginTelemetry(payload);
     await newRecord.save();
     res.status(201).json({ status: 'recorded' });
@@ -197,6 +205,8 @@ app.post('/network-usage', async (req, res) => {
     const { user_id } = payload;
     if (!user_id) return res.status(400).json({ error: 'user_id required' });
 
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    payload.original_ip = clientIp ? clientIp.split(',')[0].trim() : 'Unknown';
     payload.last_updated = new Date();
     
     await NetworkTelemetry.findOneAndUpdate(

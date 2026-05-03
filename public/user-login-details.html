@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TalkPro Telemetry - Logins</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 10px; font-size: 14px; }
@@ -29,26 +30,34 @@
   </nav>
 
   <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
       <h2 style="margin:0;">Recent Logins</h2>
-      <button class="btn" style="background:#e74c3c;" onclick="deleteAllLogins()">Delete All</button>
+      <button class="btn" style="background:#e74c3c; padding: 6px 10px;" title="Delete All Logins" onclick="deleteAllLogins()">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+      </button>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>User</th>
-          <th>Device</th>
-          <th>Android ID</th>
-          <th>Proxy IP</th>
-          <th>VPN?</th>
-          <th>Details</th>
-        </tr>
-      </thead>
-      <tbody id="logins-body">
-        <tr><td colspan="7">Loading...</td></tr>
-      </tbody>
-    </table>
+    <div style="overflow-x: auto; width: 100%;">
+      <table style="min-width: 600px;">
+        <thead>
+          <tr>
+            <th>Network IPs</th>
+            <th>Time</th>
+            <th>User</th>
+            <th>Device</th>
+            <th>VPN?</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="logins-body">
+          <tr><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div id="details-modal" class="modal-overlay">
@@ -107,11 +116,10 @@
             const timeGmt8 = new Date(rawTimestamp).toLocaleString("en-US", { hour12: true });
 
             tr.innerHTML = `
+              <td>Orig: ${net.original_ip || 'N/A'}<br><span style="color:#666">Proxy: ${net.active_proxy_ip || 'N/A'}</span></td>
               <td>${timeGmt8}</td>
               <td>${user.first_name || ''} ${user.last_name || ''} <br> <span style="color:#666">${user.phone_number || ''}</span></td>
-              <td>${dev.manufacturer || ''} ${dev.model || ''} <br> <span style="color:#666">Android ${dev.os_version || ''}</span></td>
-              <td>${dev.android_id || 'N/A'} <br> ${dev.is_emulator ? '<span class="badge badge-false">Emulator</span>' : ''}</td>
-              <td>${net.active_proxy_ip || 'N/A'}</td>
+              <td>${dev.manufacturer || ''} ${dev.model || ''} ${dev.is_emulator ? '<span class="badge badge-false" style="margin-left:4px;">Emulator</span>' : ''} <br> <span style="color:#666">Android ${dev.os_version || ''}</span></td>
               <td><span class="badge badge-${net.is_using_vpn}">${net.is_using_vpn ? 'YES' : 'NO'}</span></td>
               <td><button class="btn" onclick="showModal(${index})">View Details</button></td>
             `;
