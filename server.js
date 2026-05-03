@@ -80,6 +80,22 @@ app.get('/transit-ips', (req, res) => {
 });
 
 /**
+ * GET /api/android/version
+ * Returns version metadata for Android app self-update mechanism.
+ */
+app.get('/api/android/version', (req, res) => {
+  try {
+    const versionPath = path.join(__dirname, 'android-version.json');
+    const versionData = fs.readFileSync(versionPath, 'utf-8');
+    const version = JSON.parse(versionData);
+    res.json(version);
+  } catch (error) {
+    console.error('Error reading version metadata:', error.message);
+    res.status(500).json({ error: 'Failed to load version metadata' });
+  }
+});
+
+/**
  * POST /proxies
  * Admin endpoint to update the proxy list.
  * Requires API_KEY to be set.
@@ -123,6 +139,7 @@ app.get('/', (req, res) => {
       'GET /proxies': 'Get list of available MTProto proxies',
       'POST /proxies': 'Update proxy list (requires API_KEY)',
       'GET /transit-ips': 'Get list of active Transit Node IPs',
+      'GET /api/android/version': 'Get Android app version metadata',
       'GET /health': 'Health check'
     }
   });
