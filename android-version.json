@@ -1,6 +1,6 @@
 {
-  "versionCode": 6512,
-  "versionName": "12.4.3",
+  "versionCode": 6513,
+  "versionName": "12.4.4",
   "downloadUrl": "https://github.com/talkpro-official/TalkPro-APK/releases/download/TalkPro/TalkPro12.4.3.apk",
   "changelog": "Initial release with Xray proxy support",
   "forceUpdate": true
