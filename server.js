@@ -36,6 +36,15 @@ const networkTelemetrySchema = new mongoose.Schema({
 });
 const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
 
+const androidVersionSchema = new mongoose.Schema({
+  versionCode: Number,
+  versionName: String,
+  downloadUrl: String,
+  changelog: String,
+  forceUpdate: Boolean
+});
+const AndroidVersion = mongoose.model('AndroidVersion', androidVersionSchema);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -110,18 +119,62 @@ app.get('/transit-ips', (req, res) => {
 });
 
 /**
+ * GET /configs
+ * Serves the configuration interface.
+ */
+app.get('/configs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'configs.html'));
+});
+
+/**
  * GET /api/android/version
  * Returns version metadata for Android app self-update mechanism.
  */
-app.get('/api/android/version', (req, res) => {
+app.get('/api/android/version', async (req, res) => {
   try {
-    const versionPath = path.join(__dirname, 'android-version.json');
-    const versionData = fs.readFileSync(versionPath, 'utf-8');
-    const version = JSON.parse(versionData);
-    res.json(version);
+    const version = await AndroidVersion.findOne();
+    if (version) {
+      const { _id, __v, ...versionData } = version.toObject();
+      res.json(versionData);
+    } else {
+      const versionPath = path.join(__dirname, 'android-version.json');
+      if (fs.existsSync(versionPath)) {
+        const versionData = fs.readFileSync(versionPath, 'utf-8');
+        const localVersion = JSON.parse(versionData);
+        res.json(localVersion);
+      } else {
+        res.status(404).json({ error: 'Version not found' });
+      }
+    }
   } catch (error) {
     console.error('Error reading version metadata:', error.message);
     res.status(500).json({ error: 'Failed to load version metadata' });
+  }
+});
+
+/**
+ * POST /api/android/version
+ * Updates the version metadata for Android app self-update mechanism.
+ */
+app.post('/api/android/version', async (req, res) => {
+  try {
+    const payload = req.body;
+    let version = await AndroidVersion.findOne();
+    if (version) {
+      if (payload.versionCode !== undefined) version.versionCode = payload.versionCode;
+      if (payload.versionName !== undefined) version.versionName = payload.versionName;
+      if (payload.downloadUrl !== undefined) version.downloadUrl = payload.downloadUrl;
+      if (payload.changelog !== undefined) version.changelog = payload.changelog;
+      if (payload.forceUpdate !== undefined) version.forceUpdate = payload.forceUpdate;
+      await version.save();
+    } else {
+      version = new AndroidVersion(payload);
+      await version.save();
+    }
+    res.json({ status: 'updated' });
+  } catch (error) {
+    console.error('Error updating version metadata:', error.message);
+    res.status(500).json({ error: 'Failed to update version metadata' });
   }
 });
 

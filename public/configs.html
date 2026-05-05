@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version Configuration</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --input-bg: rgba(15, 23, 42, 0.6);
+            --input-border: rgba(148, 163, 184, 0.2);
+            --input-focus: #3b82f6;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 40%, #0f172a 100%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            margin: 1rem;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--input-focus);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .checkbox-group input {
+            width: 1.2rem;
+            height: 1.2rem;
+            margin-right: 0.75rem;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            font-size: 1rem;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        button {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background: linear-gradient(135deg, var(--primary-hover) 0%, #4338ca 100%);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .notification {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            display: none;
+        }
+
+        .notification.success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: block;
+            opacity: 1;
+        }
+
+        .notification.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            display: block;
+            opacity: 1;
+        }
+
+        /* Loading animation */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        button.loading .loader {
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        .glass-nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 0;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            z-index: 100;
+        }
+
+        .glass-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .glass-nav a:hover, .glass-nav a.active {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .endpoint-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .endpoint-list li {
+            padding: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .endpoint-list li:last-child {
+            border-bottom: none;
+        }
+
+        .method {
+            font-weight: bold;
+            font-size: 0.85rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .method.get {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .endpoint-list a {
+            color: #60a5fa;
+            text-decoration: none;
+            font-family: monospace;
+            font-size: 1.05rem;
+            transition: color 0.2s ease;
+        }
+
+        .endpoint-list a:hover {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
+
+        .endpoint-list .desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <nav class="glass-nav">
+        <a href="/user-login-details.html">Recent Logins</a>
+        <a href="/network-usage.html">Network Usage</a>
+        <a href="/configs" class="active">App Config</a>
+    </nav>
+
+    <div class="container" style="margin-top: 60px;">
+        <div class="glass-panel">
+            <h1>App Version Configuration</h1>
+            <form id="versionForm">
+                <div class="form-group">
+                    <label for="versionCode">Version Code</label>
+                    <input type="number" id="versionCode" name="versionCode" placeholder="e.g. 6514" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="versionName">Version Name</label>
+                    <input type="text" id="versionName" name="versionName" placeholder="e.g. 12.4.5" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="downloadUrl">Download URL</label>
+                    <input type="text" id="downloadUrl" name="downloadUrl" placeholder="https://..." required>
+                </div>
+
+                <div class="form-group">
+                    <label for="changelog">Changelog</label>
+                    <textarea id="changelog" name="changelog" placeholder="Enter changelog details..." required></textarea>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="forceUpdate" name="forceUpdate">
+                    <label for="forceUpdate">Require Force Update</label>
+                </div>
+
+                <button type="submit" id="submitBtn">
+                    Save Configuration
+                    <span class="loader"></span>
+                </button>
+            </form>
+            <div id="notification" class="notification"></div>
+        </div>
+
+        <div class="glass-panel" style="margin-top: 2rem;">
+            <h1>Available Endpoints</h1>
+            <ul class="endpoint-list">
+                <li><span class="method get">GET</span> <a href="/proxies" target="_blank">/proxies</a> <span class="desc">Available MTProto proxies</span></li>
+                <li><span class="method get">GET</span> <a href="/transit-ips" target="_blank">/transit-ips</a> <span class="desc">Active Transit Node IPs</span></li>
+                <li><span class="method get">GET</span> <a href="/api/android/version" target="_blank">/api/android/version</a> <span class="desc">App version metadata</span></li>
+                <li><span class="method get">GET</span> <a href="/health" target="_blank">/health</a> <span class="desc">Health check</span></li>
+                <li><span class="method get">GET</span> <a href="/api/telemetry/stats" target="_blank">/api/telemetry/stats</a> <span class="desc">Telemetry stats</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const form = document.getElementById('versionForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const notification = document.getElementById('notification');
+
+            // Fetch current config
+            try {
+                const response = await fetch('/api/android/version');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('versionCode').value = data.versionCode || '';
+                    document.getElementById('versionName').value = data.versionName || '';
+                    document.getElementById('downloadUrl').value = data.downloadUrl || '';
+                    document.getElementById('changelog').value = data.changelog || '';
+                    document.getElementById('forceUpdate').checked = data.forceUpdate || false;
+                } else {
+                    showNotification('Failed to load current version data.', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching version:', error);
+                showNotification('Error loading configuration.', 'error');
+            }
+
+            // Handle form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                submitBtn.classList.add('loading');
+                submitBtn.disabled = true;
+                
+                const payload = {
+                    versionCode: parseInt(document.getElementById('versionCode').value, 10),
+                    versionName: document.getElementById('versionName').value,
+                    downloadUrl: document.getElementById('downloadUrl').value,
+                    changelog: document.getElementById('changelog').value,
+                    forceUpdate: document.getElementById('forceUpdate').checked
+                };
+
+                try {
+                    const response = await fetch('/api/android/version', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        showNotification('Configuration saved successfully!', 'success');
+                    } else {
+                        showNotification('Failed to save configuration.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error saving version:', error);
+                    showNotification('Error saving configuration.', 'error');
+                } finally {
+                    submitBtn.classList.remove('loading');
+                    submitBtn.disabled = false;
+                }
+            });
+
+            function showNotification(message, type) {
+                notification.textContent = message;
+                notification.className = `notification ${type}`;
+                
+                setTimeout(() => {
+                    notification.className = 'notification';
+                }, 4000);
+            }
+        });
+    </script>
+</body>
+</html>
