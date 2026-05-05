@@ -29,6 +29,7 @@ const networkTelemetrySchema = new mongoose.Schema({
   user_id: { type: Number, required: true, unique: true },
   telegram_user: Object,
   original_ip: String,
+  active_proxy_ip: String,
   timestamp: Date,
   network_usage: Object,
   last_updated: Date
