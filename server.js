@@ -22,7 +22,7 @@ const loginTelemetrySchema = new mongoose.Schema({
   device_info: Object,
   network_info: Object,
   app_context: Object
-});
+}, { strict: false });
 const LoginTelemetry = mongoose.model('LoginTelemetry', loginTelemetrySchema);
 
 const networkTelemetrySchema = new mongoose.Schema({
@@ -33,7 +33,7 @@ const networkTelemetrySchema = new mongoose.Schema({
   timestamp: Date,
   network_usage: Object,
   last_updated: Date
-});
+}, { strict: false });
 const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
 
 const androidVersionSchema = new mongoose.Schema({
