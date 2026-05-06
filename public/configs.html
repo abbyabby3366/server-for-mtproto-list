@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Version Configuration</title>
+    <title>Server Configuration</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -272,6 +272,102 @@
             font-size: 0.9rem;
             margin-left: auto;
         }
+
+        /* Transit IPs section */
+        .section-divider {
+            height: 1px;
+            background: var(--glass-border);
+            margin: 1.5rem 0;
+        }
+
+        .ip-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .ip-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ip-row input {
+            flex: 1;
+        }
+
+        .ip-row .ip-index {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            color: white;
+        }
+
+        .btn-icon.remove {
+            background: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-icon.remove:hover {
+            background: rgba(239, 68, 68, 0.5);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-add-ip {
+            width: auto;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.9rem;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px dashed rgba(16, 185, 129, 0.4);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-add-ip:hover {
+            background: rgba(16, 185, 129, 0.3);
+            border-color: rgba(16, 185, 129, 0.6);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .ip-empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 1.5rem;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -319,6 +415,24 @@
         </div>
 
         <div class="glass-panel" style="margin-top: 2rem;">
+            <h1>Transit Node IPs</h1>
+            <p style="color: var(--text-muted); text-align: center; margin-top: -1rem; margin-bottom: 1.5rem; font-size: 0.9rem;">Manage the list of transit node IPs served at <code style="color: #60a5fa;">/transit-ips</code></p>
+            <div id="ipList" class="ip-list">
+                <div class="ip-empty-state">Loading...</div>
+            </div>
+            <button type="button" class="btn-add-ip" id="addIpBtn" onclick="addIpRow('')">
+                <span style="font-size: 1.1rem;">+</span> Add IP Address
+            </button>
+            <div style="margin-top: 1.5rem;">
+                <button type="button" id="saveIpsBtn" onclick="saveTransitIps()">
+                    Save Transit IPs
+                    <span class="loader"></span>
+                </button>
+            </div>
+            <div id="ipNotification" class="notification"></div>
+        </div>
+
+        <div class="glass-panel" style="margin-top: 2rem;">
             <h1>Available Endpoints</h1>
             <ul class="endpoint-list">
                 <li><span class="method get">GET</span> <a href="/proxies" target="_blank">/proxies</a> <span class="desc">Available MTProto proxies</span></li>
@@ -331,6 +445,7 @@
     </div>
 
     <script>
+        // ===== VERSION CONFIG =====
         document.addEventListener('DOMContentLoaded', async () => {
             const form = document.getElementById('versionForm');
             const submitBtn = document.getElementById('submitBtn');
@@ -400,7 +515,110 @@
                     notification.className = 'notification';
                 }, 4000);
             }
+
+            // ===== TRANSIT IPS =====
+            await loadTransitIps();
         });
+
+        // Transit IPs management
+        async function loadTransitIps() {
+            const ipList = document.getElementById('ipList');
+            try {
+                const response = await fetch('/api/transit-ips');
+                if (response.ok) {
+                    const data = await response.json();
+                    ipList.innerHTML = '';
+                    if (data.ips && data.ips.length > 0) {
+                        data.ips.forEach(ip => addIpRow(ip));
+                    } else {
+                        ipList.innerHTML = '<div class="ip-empty-state">No transit IPs configured. Click "Add IP Address" to get started.</div>';
+                    }
+                } else {
+                    ipList.innerHTML = '<div class="ip-empty-state">Failed to load transit IPs.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading transit IPs:', error);
+                ipList.innerHTML = '<div class="ip-empty-state">Error loading transit IPs.</div>';
+            }
+        }
+
+        function addIpRow(value) {
+            const ipList = document.getElementById('ipList');
+            // Clear empty state if present
+            const emptyState = ipList.querySelector('.ip-empty-state');
+            if (emptyState) emptyState.remove();
+
+            const row = document.createElement('div');
+            row.className = 'ip-row';
+            const index = ipList.querySelectorAll('.ip-row').length + 1;
+            row.innerHTML = `
+                <span class="ip-index">${index}</span>
+                <input type="text" class="transit-ip-input" value="${value}" placeholder="e.g. 95.40.68.126">
+                <button type="button" class="btn-icon remove" onclick="removeIpRow(this)" title="Remove">&times;</button>
+            `;
+            ipList.appendChild(row);
+        }
+
+        function removeIpRow(btn) {
+            const row = btn.closest('.ip-row');
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(20px)';
+            row.style.transition = 'all 0.2s ease';
+            setTimeout(() => {
+                row.remove();
+                reindexIpRows();
+                const ipList = document.getElementById('ipList');
+                if (ipList.querySelectorAll('.ip-row').length === 0) {
+                    ipList.innerHTML = '<div class="ip-empty-state">No transit IPs configured. Click "Add IP Address" to get started.</div>';
+                }
+            }, 200);
+        }
+
+        function reindexIpRows() {
+            const rows = document.querySelectorAll('.ip-row');
+            rows.forEach((row, i) => {
+                row.querySelector('.ip-index').textContent = i + 1;
+            });
+        }
+
+        async function saveTransitIps() {
+            const saveBtn = document.getElementById('saveIpsBtn');
+            const ipNotification = document.getElementById('ipNotification');
+            const inputs = document.querySelectorAll('.transit-ip-input');
+            const ips = Array.from(inputs).map(input => input.value.trim()).filter(ip => ip.length > 0);
+
+            saveBtn.classList.add('loading');
+            saveBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/transit-ips', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ips })
+                });
+
+                if (response.ok) {
+                    showIpNotification(`Transit IPs saved successfully! (${ips.length} IP${ips.length !== 1 ? 's' : ''})`, 'success');
+                } else {
+                    showIpNotification('Failed to save transit IPs.', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving transit IPs:', error);
+                showIpNotification('Error saving transit IPs.', 'error');
+            } finally {
+                saveBtn.classList.remove('loading');
+                saveBtn.disabled = false;
+            }
+        }
+
+        function showIpNotification(message, type) {
+            const ipNotification = document.getElementById('ipNotification');
+            ipNotification.textContent = message;
+            ipNotification.className = `notification ${type}`;
+            setTimeout(() => {
+                ipNotification.className = 'notification';
+            }, 4000);
+        }
     </script>
 </body>
 </html>

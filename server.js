@@ -45,6 +45,11 @@ const androidVersionSchema = new mongoose.Schema({
 });
 const AndroidVersion = mongoose.model('AndroidVersion', androidVersionSchema);
 
+const transitIpsSchema = new mongoose.Schema({
+  ips: [String]
+});
+const TransitIps = mongoose.model('TransitIps', transitIpsSchema);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -104,10 +109,15 @@ app.get('/health', (req, res) => {
 
 /**
  * GET /transit-ips
- * Returns a list of active Transit Node IPs from local JSON.
+ * Returns a list of active Transit Node IPs from MongoDB (falls back to local JSON).
  */
-app.get('/transit-ips', (req, res) => {
+app.get('/transit-ips', async (req, res) => {
   try {
+    const record = await TransitIps.findOne();
+    if (record && record.ips && record.ips.length > 0) {
+      return res.json(record.ips);
+    }
+    // Fallback to local JSON file
     const ipsPath = path.join(__dirname, 'transit-ips.json');
     const ipsData = fs.readFileSync(ipsPath, 'utf-8');
     const ips = JSON.parse(ipsData);
@@ -115,6 +125,59 @@ app.get('/transit-ips', (req, res) => {
   } catch (error) {
     console.error('Error reading IPs:', error.message);
     res.status(500).json({ error: 'Failed to load IP list' });
+  }
+});
+
+/**
+ * GET /api/transit-ips
+ * Returns the transit IPs config for the UI.
+ */
+app.get('/api/transit-ips', async (req, res) => {
+  try {
+    const record = await TransitIps.findOne();
+    if (record) {
+      return res.json({ ips: record.ips });
+    }
+    // Fallback: read from local JSON and seed into DB
+    const ipsPath = path.join(__dirname, 'transit-ips.json');
+    if (fs.existsSync(ipsPath)) {
+      const ipsData = fs.readFileSync(ipsPath, 'utf-8');
+      const ips = JSON.parse(ipsData);
+      const newRecord = new TransitIps({ ips });
+      await newRecord.save();
+      return res.json({ ips });
+    }
+    res.json({ ips: [] });
+  } catch (error) {
+    console.error('Error reading transit IPs:', error.message);
+    res.status(500).json({ error: 'Failed to load transit IPs' });
+  }
+});
+
+/**
+ * POST /api/transit-ips
+ * Updates the transit IPs list in MongoDB.
+ */
+app.post('/api/transit-ips', async (req, res) => {
+  try {
+    const { ips } = req.body;
+    if (!Array.isArray(ips)) {
+      return res.status(400).json({ error: 'ips must be an array of IP strings' });
+    }
+    // Filter out empty strings
+    const cleanIps = ips.map(ip => ip.trim()).filter(ip => ip.length > 0);
+    let record = await TransitIps.findOne();
+    if (record) {
+      record.ips = cleanIps;
+      await record.save();
+    } else {
+      record = new TransitIps({ ips: cleanIps });
+      await record.save();
+    }
+    res.json({ status: 'updated', count: cleanIps.length });
+  } catch (error) {
+    console.error('Error updating transit IPs:', error.message);
+    res.status(500).json({ error: 'Failed to update transit IPs' });
   }
 });
 
