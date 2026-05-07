@@ -31,7 +31,17 @@
 
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-      <h2 style="margin:0;">Network Usage</h2>
+      <div style="display:flex; align-items:center; gap:15px;">
+        <h2 style="margin:0;">Network Usage</h2>
+        <button class="btn" style="background:#2ecc71; padding: 6px 12px; font-weight: bold;" title="View Statistics" onclick="showStatsModal()">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
+            <rect x="18" y="3" width="4" height="18"></rect>
+            <rect x="10" y="8" width="4" height="13"></rect>
+            <rect x="2" y="13" width="4" height="8"></rect>
+          </svg>
+          View Stats
+        </button>
+      </div>
       <button class="btn" style="background:#e74c3c; padding: 6px 10px;" title="Delete All Network Data" onclick="deleteAllNetwork()">
         <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
           <polyline points="3 6 5 6 21 6"></polyline>
@@ -70,6 +80,16 @@
     </div>
   </div>
 
+  <div id="stats-modal" class="modal-overlay">
+    <div class="modal" style="max-width: 450px;">
+      <span class="modal-close" onclick="closeStatsModal()">✕</span>
+      <h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 10px;">App Usage Statistics</h3>
+      <div id="stats-content" style="margin-top: 15px;">
+        <!-- Stats will be populated here -->
+      </div>
+    </div>
+  </div>
+
   <script>
     let allNetwork = [];
 
@@ -81,6 +101,91 @@
 
     function closeModal() {
       document.getElementById('details-modal').style.display = 'none';
+    }
+
+    function showStatsModal() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const activeUsersToday = new Set();
+      let totalBytesSent = 0;
+      let totalBytesReceived = 0;
+      let wifiUsers = 0;
+      let mobileUsers = 0;
+      let topUser = { name: 'N/A', bytes: 0 };
+
+      allNetwork.forEach(row => {
+        // Active users today
+        const lastUpdated = new Date(row.last_updated);
+        if (lastUpdated >= today) {
+          activeUsersToday.add(row.user_id || row.phone_number || row.original_ip || Math.random());
+        }
+
+        // Totals
+        const sent = row.network_usage?.total_bytes_sent || 0;
+        const received = row.network_usage?.total_bytes_received || 0;
+        const totalUserBytes = sent + received;
+        totalBytesSent += sent;
+        totalBytesReceived += received;
+
+        // Top user
+        if (totalUserBytes > topUser.bytes) {
+          topUser = {
+            name: `${row.first_name || 'Unknown'} ${row.last_name || ''}`.trim() || row.phone_number || 'Unknown',
+            bytes: totalUserBytes
+          };
+        }
+
+        // Connection Preference (based on total bytes sent)
+        const wifiSent = row.network_usage?.wifi_bytes_sent || 0;
+        const mobileSent = row.network_usage?.mobile_bytes_sent || 0;
+        if (wifiSent > mobileSent) {
+          wifiUsers++;
+        } else if (mobileSent > wifiSent) {
+          mobileUsers++;
+        }
+      });
+
+      const totalUsers = allNetwork.length;
+
+      const html = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #2ecc71;">${activeUsersToday.size}</div>
+            <div style="font-size: 12px; color: #666; text-transform: uppercase;">Active Today</div>
+          </div>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #3498db;">${totalUsers}</div>
+            <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Users</div>
+          </div>
+        </div>
+
+        <ul style="list-style: none; padding: 0; margin-top: 20px;">
+          <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+            <strong>Total Data Sent (All-Time):</strong> 
+            <span class="bytes">${formatBytes(totalBytesSent)}</span>
+          </li>
+          <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+            <strong>Total Data Received (All-Time):</strong> 
+            <span class="bytes">${formatBytes(totalBytesReceived)}</span>
+          </li>
+          <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+            <strong>Top User (Data Volume):</strong> 
+            <span>${topUser.name} <span class="sub-text">(${formatBytes(topUser.bytes)})</span></span>
+          </li>
+          <li style="padding: 10px 0; display: flex; justify-content: space-between;">
+            <strong>Preferred Network Type:</strong> 
+            <span>${wifiUsers >= mobileUsers ? 'WiFi 📶' : 'Mobile Data 📱'}</span>
+          </li>
+        </ul>
+      `;
+
+      document.getElementById('stats-content').innerHTML = html;
+      document.getElementById('stats-modal').style.display = 'flex';
+    }
+
+    function closeStatsModal() {
+      document.getElementById('stats-modal').style.display = 'none';
     }
 
     async function deleteAllNetwork() {
