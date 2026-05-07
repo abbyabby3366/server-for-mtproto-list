@@ -46,7 +46,8 @@ const androidVersionSchema = new mongoose.Schema({
 const AndroidVersion = mongoose.model('AndroidVersion', androidVersionSchema);
 
 const transitIpsSchema = new mongoose.Schema({
-  ips: [String]
+  ips: [String],
+  remarks: String
 });
 const TransitIps = mongoose.model('TransitIps', transitIpsSchema);
 
@@ -136,7 +137,7 @@ app.get('/api/transit-ips', async (req, res) => {
   try {
     const record = await TransitIps.findOne();
     if (record) {
-      return res.json({ ips: record.ips });
+      return res.json({ ips: record.ips, remarks: record.remarks || '' });
     }
     // Fallback: read from local JSON and seed into DB
     const ipsPath = path.join(__dirname, 'transit-ips.json');
@@ -160,7 +161,7 @@ app.get('/api/transit-ips', async (req, res) => {
  */
 app.post('/api/transit-ips', async (req, res) => {
   try {
-    const { ips } = req.body;
+    const { ips, remarks } = req.body;
     if (!Array.isArray(ips)) {
       return res.status(400).json({ error: 'ips must be an array of IP strings' });
     }
@@ -169,9 +170,10 @@ app.post('/api/transit-ips', async (req, res) => {
     let record = await TransitIps.findOne();
     if (record) {
       record.ips = cleanIps;
+      if (remarks !== undefined) record.remarks = remarks;
       await record.save();
     } else {
-      record = new TransitIps({ ips: cleanIps });
+      record = new TransitIps({ ips: cleanIps, remarks: remarks || '' });
       await record.save();
     }
     res.json({ status: 'updated', count: cleanIps.length });
