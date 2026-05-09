@@ -26,7 +26,7 @@ const loginTelemetrySchema = new mongoose.Schema({
 const LoginTelemetry = mongoose.model('LoginTelemetry', loginTelemetrySchema);
 
 const networkTelemetrySchema = new mongoose.Schema({
-  user_id: { type: Number, required: true, unique: true },
+  user_id: { type: Number, required: true },
   telegram_user: Object,
   original_ip: String,
   active_proxy_ip: String,
@@ -35,6 +35,21 @@ const networkTelemetrySchema = new mongoose.Schema({
   last_updated: Date
 }, { strict: false });
 const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
+
+const networkDailyBucketSchema = new mongoose.Schema({
+  user_id: { type: Number, required: true },
+  date: { type: String, required: true },
+  telegram_user: Object,
+  original_ip: String,
+  active_proxy_ip: String,
+  total_bytes_sent: { type: Number, default: 0 },
+  total_bytes_received: { type: Number, default: 0 },
+  last_updated: Date
+}, { strict: false });
+networkDailyBucketSchema.index({ user_id: 1, date: 1 }, { unique: true });
+const NetworkDailyBucket = mongoose.model('NetworkDailyBucket', networkDailyBucketSchema);
+
+
 
 const androidVersionSchema = new mongoose.Schema({
   versionCode: Number,
@@ -328,11 +343,34 @@ app.post('/network-usage', async (req, res) => {
     payload.original_ip = clientIp ? clientIp.split(',')[0].trim() : 'Unknown';
     payload.last_updated = new Date();
     
-    await NetworkTelemetry.findOneAndUpdate(
-      { user_id },
-      payload,
-      { upsert: true, new: true }
-    );
+    // --- Daily Bucket Logic ---
+    const todayStr = new Date().toISOString().split('T')[0]; // e.g. "2026-05-09"
+    
+    // Get existing latest state to calculate delta
+    const existing = await NetworkTelemetry.findOne({ user_id }).sort({ last_updated: -1 });
+    
+    // If payload doesn't include active_proxy_ip, check active_connection.ip, then fallback to existing
+    let finalProxyIp = payload.active_proxy_ip || payload.active_connection?.ip || existing?.active_proxy_ip;
+    payload.active_proxy_ip = finalProxyIp;
+    
+    let deltaSent = payload.network_usage?.total_bytes_sent || 0;
+    let deltaReceived = payload.network_usage?.total_bytes_received || 0;
+    
+    if (existing && existing.network_usage) {
+       const oldSent = existing.network_usage.total_bytes_sent || 0;
+       const oldRecv = existing.network_usage.total_bytes_received || 0;
+       
+       if (deltaSent >= oldSent) deltaSent = deltaSent - oldSent;
+       if (deltaReceived >= oldRecv) deltaReceived = deltaReceived - oldRecv;
+    }
+    
+    payload.delta_sent = deltaSent;
+    payload.delta_received = deltaReceived;
+
+    delete payload._id;
+    delete payload.__v;
+    await NetworkTelemetry.create(payload);
+    
     res.status(200).json({ status: 'updated' });
   } catch (error) {
     console.error('Error updating network telemetry:', error);
@@ -344,25 +382,29 @@ app.post('/network-usage', async (req, res) => {
  * GET /api/telemetry/stats (for the frontend dashboard)
  */
 app.get('/api/telemetry/stats', async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   try {
     const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(100);
-    const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).lean();
+    const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).limit(500).lean();
     
     // Attach phone number from latest login to network data
     const network = await Promise.all(networkRaw.map(async (net) => {
       let phone = net.telegram_user?.phone_number;
       let fName = net.telegram_user?.first_name;
       let lName = net.telegram_user?.last_name;
+      let proxyIp = net.active_proxy_ip || net.active_connection?.ip || 'Unknown';
       
+      // We only fallback name/phone to LoginTelemetry, NOT the proxy IP.
       if (!phone && phone !== "") {
         const userLogin = await LoginTelemetry.findOne({ "telegram_user.user_id": net.user_id }).sort({ timestamp: -1 }).lean();
-        phone = userLogin?.telegram_user?.phone_number || "";
-        fName = userLogin?.telegram_user?.first_name || "Unknown";
-        lName = userLogin?.telegram_user?.last_name || "";
+        phone = phone || userLogin?.telegram_user?.phone_number || "";
+        fName = fName || userLogin?.telegram_user?.first_name || "Unknown";
+        lName = lName || userLogin?.telegram_user?.last_name || "";
       }
       
       return {
         ...net,
+        active_proxy_ip: proxyIp,
         phone_number: phone,
         first_name: fName || "Unknown",
         last_name: lName || ""
@@ -372,6 +414,221 @@ app.get('/api/telemetry/stats', async (req, res) => {
     res.json({ logins, network });
   } catch (error) {
     console.error('Stats Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * GET /api/telemetry/all-buckets
+ * Fetches all daily buckets sorted chronologically
+ */
+app.get('/api/telemetry/all-buckets', async (req, res) => {
+  try {
+    const buckets = await NetworkDailyBucket.find().sort({ date: -1, last_updated: -1 }).limit(1000).lean();
+    
+    const populated = await Promise.all(buckets.map(async (b) => {
+       let phone = b.telegram_user?.phone_number;
+       
+       if (!phone) {
+          const userLogin = await LoginTelemetry.findOne({ "telegram_user.user_id": b.user_id }).sort({ timestamp: -1 }).lean();
+          b.telegram_user = b.telegram_user || {};
+          b.telegram_user.phone_number = userLogin?.telegram_user?.phone_number || "";
+          b.telegram_user.first_name = userLogin?.telegram_user?.first_name || "Unknown";
+          b.telegram_user.last_name = userLogin?.telegram_user?.last_name || "";
+       }
+       return b;
+    }));
+    
+    res.json(populated);
+  } catch (error) {
+    console.error('All Buckets Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+
+/**
+ * GET /api/telemetry/daily-stats
+ * Returns the aggregated statistics required for analytics
+ */
+app.get('/api/telemetry/daily-stats', async (req, res) => {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStart = new Date(todayStr);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const dailyActiveUsersRaw = await NetworkTelemetry.distinct("user_id", { last_updated: { $gte: todayStart, $lt: tomorrowStart } });
+    const dailyActiveUsers = dailyActiveUsersRaw.length;
+
+    const totalUsersRaw = await NetworkTelemetry.distinct("user_id");
+    const totalUsers = totalUsersRaw.length;
+
+    const firstLogins = await LoginTelemetry.aggregate([
+      { $group: { _id: "$telegram_user.user_id", first_login: { $min: "$timestamp" } } }
+    ]);
+    const dailyNewUsers = firstLogins.filter(u => u.first_login && u.first_login >= todayStart && u.first_login < tomorrowStart).length;
+
+    const statsRaw = await NetworkTelemetry.aggregate([
+      { $group: {
+          _id: "$user_id",
+          total_sent: { $sum: "$delta_sent" },
+          total_received: { $sum: "$delta_received" },
+          telegram_user: { $first: "$telegram_user" }
+      }}
+    ]);
+
+    let sumTotalSent = 0;
+    let sumTotalReceived = 0;
+    const userTrafficMap = {};
+
+    statsRaw.forEach(userStat => {
+      const sent = userStat.total_sent || 0;
+      const recv = userStat.total_received || 0;
+      sumTotalSent += sent;
+      sumTotalReceived += recv;
+      
+      userTrafficMap[userStat._id] = {
+        user_id: userStat._id,
+        telegram_user: userStat.telegram_user,
+        total_traffic: sent + recv
+      };
+    });
+
+    const todayStatsRaw = await NetworkTelemetry.aggregate([
+      { $match: { last_updated: { $gte: todayStart, $lt: tomorrowStart } } },
+      { $group: {
+          _id: "$user_id",
+          today_sent: { $sum: "$delta_sent" },
+          today_received: { $sum: "$delta_received" }
+      }}
+    ]);
+
+    let sumDailySent = 0;
+    let sumDailyReceived = 0;
+
+    todayStatsRaw.forEach(userStat => {
+      sumDailySent += userStat.today_sent || 0;
+      sumDailyReceived += userStat.today_received || 0;
+    });
+
+    const avgTotalSent = totalUsers ? (sumTotalSent / totalUsers) : 0;
+    const avgTotalReceived = totalUsers ? (sumTotalReceived / totalUsers) : 0;
+    const avgDailySent = dailyActiveUsers ? (sumDailySent / dailyActiveUsers) : 0;
+    const avgDailyReceived = dailyActiveUsers ? (sumDailyReceived / dailyActiveUsers) : 0;
+    
+    let topUsers = Object.values(userTrafficMap).sort((a, b) => b.total_traffic - a.total_traffic).slice(0, 20);
+    
+    topUsers = topUsers.map(tu => {
+       const userFirstLogin = firstLogins.find(fl => fl._id === tu.user_id);
+       let usageDays = 0;
+       if (userFirstLogin && userFirstLogin.first_login) {
+           const diffTime = Math.abs(new Date() - new Date(userFirstLogin.first_login));
+           usageDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+       }
+       return { ...tu, usage_days: usageDays || 1 };
+    });
+    
+    res.json({
+      dailyActiveUsers,
+      dailyNewUsers,
+      totalUsers,
+      avgTotalSent,
+      avgTotalReceived,
+      avgDailySent,
+      avgDailyReceived,
+      topUsers
+    });
+  } catch (error) {
+    console.error('Daily Stats Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * GET /api/telemetry/xray-stats
+ * Returns Xray Proxy stats filtered by timeframe
+ */
+app.get('/api/telemetry/xray-stats', async (req, res) => {
+  try {
+    const { timeframe = 'today' } = req.query;
+    let query = {};
+    const now = new Date();
+    let startTime, endTime;
+    let timeRangeText = "";
+
+    if (timeframe === 'today') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+      timeRangeText = `Today (${startTime.toLocaleDateString()})`;
+    } else if (timeframe === 'yesterday') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+      timeRangeText = `Yesterday (${startTime.toLocaleDateString()})`;
+    } else if (timeframe === 'this_week') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Sunday
+      endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+      timeRangeText = `This Week (${startTime.toLocaleDateString()} - ${now.toLocaleDateString()})`;
+    } else if (timeframe === 'last_hour') {
+      startTime = new Date(now.getTime() - 60 * 60 * 1000);
+      endTime = now;
+      query.last_updated = { $gte: startTime, $lte: endTime };
+      timeRangeText = `Last Hour (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
+    } else { // all_time
+      timeRangeText = "All Time";
+    }
+
+    const statsRaw = await NetworkTelemetry.aggregate([
+      { $match: query },
+      { $group: {
+          _id: { 
+            proxy: { $ifNull: ["$active_proxy_ip", "$active_connection.ip"] }, 
+            user: "$user_id" 
+          },
+          total_sent: { $sum: "$delta_sent" },
+          total_received: { $sum: "$delta_received" },
+          user_data: { $first: "$telegram_user" }
+      }},
+      { $group: {
+          _id: "$_id.proxy",
+          total_sent: { $sum: "$total_sent" },
+          total_received: { $sum: "$total_received" },
+          user_ids: { $addToSet: "$_id.user" },
+          users_data: { $push: { id: "$_id.user", user: "$user_data" } }
+      }}
+    ]);
+
+    const results = statsRaw.map(st => {
+      const uniqueUsersMap = {};
+      st.users_data.forEach(u => {
+         if (!uniqueUsersMap[u.id] && u.user) {
+            uniqueUsersMap[u.id] = u.user;
+         }
+      });
+      
+      const usersList = Object.entries(uniqueUsersMap).map(([id, u]) => {
+        return {
+          id: id,
+          name: `${u.first_name || 'Unknown'} ${u.last_name || ''}`.trim() || u.phone_number || 'Unknown'
+        };
+      });
+
+      return {
+        ip: st._id || 'Unknown',
+        userCount: st.user_ids.length,
+        totalSent: st.total_sent,
+        totalReceived: st.total_received,
+        users: usersList
+      };
+    });
+
+    results.sort((a, b) => b.userCount - a.userCount);
+    res.json({ timeRangeText, results });
+  } catch (error) {
+    console.error('Xray Stats Error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -394,6 +651,7 @@ app.delete('/api/telemetry/logins', async (req, res) => {
 app.delete('/api/telemetry/network', async (req, res) => {
   try {
     await NetworkTelemetry.deleteMany({});
+    await NetworkDailyBucket.deleteMany({});
     res.json({ status: 'deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });

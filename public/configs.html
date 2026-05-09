@@ -8,8 +8,8 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 10px; font-size: 14px; }
         h2 { color: #2c3e50; margin-top: 0; font-size: 18px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-        nav { margin-bottom: 15px; }
-        nav a { text-decoration: none; padding: 6px 12px; background: #2c3e50; color: white; border-radius: 4px; margin-right: 5px; font-weight: 500; }
+        nav { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        nav a { text-decoration: none; padding: 6px 12px; background: #2c3e50; color: white; border-radius: 4px; font-weight: 500; white-space: nowrap; }
         .card { background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; margin-bottom: 15px; max-width: 800px; }
         .form-group { margin-bottom: 12px; }
         label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: #555; }
@@ -47,11 +47,14 @@
         .loader { display: none; margin-left: 8px; font-size: 12px; color: #fff; }
         .loading .loader { display: inline; }
     </style>
+    <script src="/i18n.js"></script>
 </head>
 <body>
     <nav>
         <a href="/user-login-details.html" style="background:#bdc3c7; color:#333;">Recent Logins</a>
         <a href="/network-usage.html" style="background:#bdc3c7; color:#333;">Network Usage</a>
+        <a href="/xray-stats.html" style="background:#bdc3c7; color:#333;">Xray IP Stats</a>
+        <a href="/analytics.html" style="background:#bdc3c7; color:#333;">Analytics</a>
         <a href="/configs">App Config</a>
     </nav>
 

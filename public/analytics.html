@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TalkPro Telemetry - Analytics</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 10px; font-size: 14px; }
+    h2 { color: #2c3e50; margin-top: 0; font-size: 18px; margin-bottom: 15px; }
+    nav { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    nav a { text-decoration: none; padding: 6px 12px; background: #2c3e50; color: white; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+    .card { background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; margin-bottom: 15px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f8f9fa; font-weight: 600; }
+    .bytes { font-family: monospace; font-size: 13px; color: #2980b9; font-weight: bold; }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #3498db;
+      text-align: center;
+    }
+    .stat-box.green { border-color: #2ecc71; }
+    .stat-box.purple { border-color: #9b59b6; }
+    .stat-box.orange { border-color: #f39c12; }
+    
+    .stat-value { font-size: 24px; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
+    .stat-label { font-size: 12px; color: #666; text-transform: uppercase; font-weight: 600; }
+  </style>
+  <script src="/i18n.js"></script>
+</head>
+<body>
+  <nav>
+    <a href="/user-login-details.html" style="background:#bdc3c7; color:#333;">Recent Logins</a>
+    <a href="/network-usage.html" style="background:#bdc3c7; color:#333;">Network Usage</a>
+    <a href="/xray-stats.html" style="background:#bdc3c7; color:#333;">Xray IP Stats</a>
+    <a href="/analytics.html">Analytics</a>
+    <a href="/configs" style="background:#bdc3c7; color:#333;">App Config</a>
+  </nav>
+
+  <div class="card">
+    <h2>Daily Network Statistics</h2>
+    
+    <div class="stats-grid" id="kpi-container">
+      <div class="stat-box green">
+        <div class="stat-value" id="kpi-dau">-</div>
+        <div class="stat-label" data-i18n>Daily Active Users</div>
+      </div>
+      <div class="stat-box green">
+        <div class="stat-value" id="kpi-dnu">-</div>
+        <div class="stat-label" data-i18n>Daily New Users</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="kpi-tu">-</div>
+        <div class="stat-label" data-i18n>Total Users (All-time)</div>
+      </div>
+      <div class="stat-box purple">
+        <div class="stat-value bytes" id="kpi-avg-up">-</div>
+        <div class="stat-label" data-i18n>Avg Total Upload / User</div>
+      </div>
+      <div class="stat-box purple">
+        <div class="stat-value bytes" id="kpi-avg-dl">-</div>
+        <div class="stat-label" data-i18n>Avg Total Download / User</div>
+      </div>
+      <div class="stat-box orange">
+        <div class="stat-value bytes" id="kpi-avg-d-up">-</div>
+        <div class="stat-label" data-i18n>Avg Daily Upload / User</div>
+      </div>
+      <div class="stat-box orange">
+        <div class="stat-value bytes" id="kpi-avg-d-dl">-</div>
+        <div class="stat-label" data-i18n>Avg Daily Download / User</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Top 20 Users by Traffic</h2>
+    <div style="overflow-x: auto; width: 100%;">
+      <table style="min-width: 600px;">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Traffic</th>
+            <th>Usage Days</th>
+          </tr>
+        </thead>
+        <tbody id="top-users-body">
+          <tr><td colspan="3">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    function formatBytes(bytes) {
+      if (bytes === 0 || !bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    async function loadData() {
+      try {
+        const tbody = document.getElementById('top-users-body');
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 20px;">
+            <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <div style="margin-top: 10px; color: #666;" data-i18n>Calculating on the fly...</div>
+        </td></tr>`;
+        
+        if (!document.getElementById('spinner-style')) {
+            const style = document.createElement('style');
+            style.id = 'spinner-style';
+            style.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+            document.head.appendChild(style);
+        }
+
+        const res = await fetch('/api/telemetry/daily-stats');
+        const data = await res.json();
+
+        // Update KPIs
+        document.getElementById('kpi-dau').innerText = data.dailyActiveUsers || 0;
+        document.getElementById('kpi-dnu').innerText = data.dailyNewUsers || 0;
+        document.getElementById('kpi-tu').innerText = data.totalUsers || 0;
+        document.getElementById('kpi-avg-up').innerText = formatBytes(data.avgTotalSent);
+        document.getElementById('kpi-avg-dl').innerText = formatBytes(data.avgTotalReceived);
+        document.getElementById('kpi-avg-d-up').innerText = formatBytes(data.avgDailySent);
+        document.getElementById('kpi-avg-d-dl').innerText = formatBytes(data.avgDailyReceived);
+
+        // Update Top Users
+        tbody.innerHTML = '';
+        
+        if (!data.topUsers || data.topUsers.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3">No user data available yet.</td></tr>';
+        } else {
+          data.topUsers.forEach((user, index) => {
+            const tr = document.createElement('tr');
+            
+            let displayName = 'Unknown';
+            if (user.telegram_user) {
+              displayName = `${user.telegram_user.first_name || ''} ${user.telegram_user.last_name || ''}`.trim() 
+                            || user.telegram_user.phone_number 
+                            || user.user_id;
+            } else {
+              displayName = user.user_id;
+            }
+
+            tr.innerHTML = `
+              <td><strong>#${index + 1}</strong> ${displayName}</td>
+              <td class="bytes">${formatBytes(user.total_traffic)}</td>
+              <td>${user.usage_days}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    
+    loadData();
+    setInterval(loadData, 30000); // 30s refresh
+  </script>
+</body>
+</html>
