@@ -84,6 +84,14 @@
           </tbody>
         </table>
       </div>
+      <div id="pagination-user" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-top: 1px solid #ddd; display: none;">
+        <div>
+          <button class="btn" onclick="prevPageUser()">Previous</button>
+          <span id="page-info-user" style="margin: 0 15px; font-weight: bold;">Page 1</span>
+          <button class="btn" onclick="nextPageUser()">Next</button>
+        </div>
+        <div id="total-info-user" style="color: #666; font-size: 13px;"></div>
+      </div>
     </div>
 
     <div id="tab-time" class="tab-content">
@@ -103,6 +111,14 @@
             <tr><td colspan="6">Loading...</td></tr>
           </tbody>
         </table>
+      </div>
+      <div id="pagination-time" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-top: 1px solid #ddd; display: none;">
+        <div>
+          <button class="btn" onclick="prevPageTime()">Previous</button>
+          <span id="page-info-time" style="margin: 0 15px; font-weight: bold;">Page 1</span>
+          <button class="btn" onclick="nextPageTime()">Next</button>
+        </div>
+        <div id="total-info-time" style="color: #666; font-size: 13px;"></div>
       </div>
     </div>
   </div>
@@ -254,6 +270,122 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
+    let uniqueUsersArray = [];
+    let allBucketsArray = [];
+    let currentPageUser = 1;
+    const itemsPerPageUser = 50;
+    let currentPageTime = 1;
+    const itemsPerPageTime = 50;
+
+    function renderUserTable() {
+      const netBody = document.getElementById('network-body');
+      netBody.innerHTML = '';
+      if (uniqueUsersArray.length === 0) {
+        netBody.innerHTML = '<tr><td colspan="7">No network data yet.</td></tr>';
+        document.getElementById('pagination-user').style.display = 'none';
+        return;
+      }
+      
+      document.getElementById('pagination-user').style.display = 'flex';
+      const totalPages = Math.ceil(uniqueUsersArray.length / itemsPerPageUser);
+      if (currentPageUser > totalPages) currentPageUser = totalPages;
+      if (currentPageUser < 1) currentPageUser = 1;
+
+      document.getElementById('page-info-user').textContent = `Page ${currentPageUser} of ${totalPages}`;
+      document.getElementById('total-info-user').textContent = `Total Users: ${uniqueUsersArray.length}`;
+
+      const startIndex = (currentPageUser - 1) * itemsPerPageUser;
+      const endIndex = startIndex + itemsPerPageUser;
+      const paginatedData = uniqueUsersArray.slice(startIndex, endIndex);
+
+      paginatedData.forEach(({ row, index }) => {
+        const tr = document.createElement('tr');
+        tr.id = 'user-row-' + row.user_id;
+        tr.innerHTML = `
+          <td>
+            <strong style="color: #2980b9;">${row.active_proxy_ip || 'Unknown'}</strong><br>
+            <span style="color:#666; font-size: 11px;">(ori: ${row.original_ip || 'Unknown'})</span>
+          </td>
+          <td>${row.first_name || 'Unknown'} ${row.last_name || ''} <br> <span style="color:#666">${row.phone_number || row.user_id}</span></td>
+          <td>${new Date(row.last_updated).toLocaleString()}</td>
+          <td class="bytes">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
+          <td class="bytes">${formatBytes(row.network_usage?.total_bytes_received)}</td>
+          <td class="bytes">
+            S: ${formatBytes(row.network_usage?.mobile_bytes_sent)}<br>
+            <span class="sub-text">R: ${formatBytes(row.network_usage?.mobile_bytes_received)}</span>
+          </td>
+          <td class="bytes">
+            S: ${formatBytes(row.network_usage?.wifi_bytes_sent)}<br>
+            <span class="sub-text">R: ${formatBytes(row.network_usage?.wifi_bytes_received)}</span>
+          </td>
+          <td><button class="btn" onclick="showModal(${index})">${window.t ? window.t("View Details") : "View Details"}</button></td>
+        `;
+        netBody.appendChild(tr);
+      });
+      
+      if (window.updateTranslations) window.updateTranslations();
+    }
+
+    function renderTimeTable() {
+      const timeBody = document.getElementById('time-body');
+      timeBody.innerHTML = '';
+      if (allBucketsArray.length === 0) {
+        timeBody.innerHTML = '<tr><td colspan="6">No historical data yet.</td></tr>';
+        document.getElementById('pagination-time').style.display = 'none';
+        return;
+      }
+      
+      document.getElementById('pagination-time').style.display = 'flex';
+      const totalPages = Math.ceil(allBucketsArray.length / itemsPerPageTime);
+      if (currentPageTime > totalPages) currentPageTime = totalPages;
+      if (currentPageTime < 1) currentPageTime = 1;
+
+      document.getElementById('page-info-time').textContent = `Page ${currentPageTime} of ${totalPages}`;
+      document.getElementById('total-info-time').textContent = `Total Pings: ${allBucketsArray.length}`;
+
+      const startIndex = (currentPageTime - 1) * itemsPerPageTime;
+      const endIndex = startIndex + itemsPerPageTime;
+      const paginatedData = allBucketsArray.slice(startIndex, endIndex);
+
+      paginatedData.forEach((row, i) => {
+        const actualIndex = startIndex + i;
+        const tr = document.createElement('tr');
+        
+        let displayName = 'Unknown';
+        if (row.first_name || row.last_name || row.phone_number) {
+          displayName = `${row.first_name || 'Unknown'} ${row.last_name || ''}`.trim() || row.phone_number || row.user_id;
+        } else if (row.telegram_user) {
+          displayName = `${row.telegram_user.first_name || 'Unknown'} ${row.telegram_user.last_name || ''}`.trim() || row.telegram_user.phone_number || row.user_id;
+        } else {
+          displayName = row.user_id;
+        }
+
+        const dt = new Date(row.last_updated || row.timestamp);
+        tr.innerHTML = `
+          <td>
+            <strong style="color: #2980b9;">${row.active_proxy_ip || 'Unknown'}</strong><br>
+            <span style="color:#666; font-size: 11px;">(ori: ${row.original_ip || 'Unknown'})</span>
+          </td>
+          <td>${displayName}</td>
+          <td>
+            <strong>${dt.toLocaleDateString()}</strong><br>
+            <span style="color:#666; font-size:11px;">${dt.toLocaleTimeString()}</span>
+          </td>
+          <td class="bytes" style="color: #2980b9;">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
+          <td class="bytes" style="color: #2ecc71;">${formatBytes(row.network_usage?.total_bytes_received)}</td>
+          <td><button class="btn" onclick="showModal(${actualIndex})">${window.t ? window.t("View Details") : "View Details"}</button></td>
+        `;
+        timeBody.appendChild(tr);
+      });
+      
+      if (window.updateTranslations) window.updateTranslations();
+    }
+
+    function prevPageUser() { if (currentPageUser > 1) { currentPageUser--; renderUserTable(); } }
+    function nextPageUser() { if (currentPageUser < Math.ceil(uniqueUsersArray.length / itemsPerPageUser)) { currentPageUser++; renderUserTable(); } }
+    function prevPageTime() { if (currentPageTime > 1) { currentPageTime--; renderTimeTable(); } }
+    function nextPageTime() { if (currentPageTime < Math.ceil(allBucketsArray.length / itemsPerPageTime)) { currentPageTime++; renderTimeTable(); } }
+
     async function loadData() {
       try {
         const res = await fetch('/api/telemetry/stats?t=' + new Date().getTime());
@@ -268,85 +400,14 @@
             uniqueUsersMap.set(row.user_id, { row, index });
           }
         });
-        const uniqueUsers = Array.from(uniqueUsersMap.values());
+        uniqueUsersArray = Array.from(uniqueUsersMap.values());
 
-        document.getElementById('user-count').textContent = `(${uniqueUsers.length})`;
+        document.getElementById('user-count').textContent = `(${uniqueUsersArray.length})`;
+        renderUserTable();
         
-        const netBody = document.getElementById('network-body');
-        netBody.innerHTML = '';
-        if (uniqueUsers.length === 0) {
-          netBody.innerHTML = '<tr><td colspan="7">No network data yet.</td></tr>';
-        } else {
-          uniqueUsers.forEach(({ row, index }) => {
-            const tr = document.createElement('tr');
-            tr.id = 'user-row-' + row.user_id;
-            tr.innerHTML = `
-              <td>
-                <strong style="color: #2980b9;">${row.active_proxy_ip || 'Unknown'}</strong><br>
-                <span style="color:#666; font-size: 11px;">(ori: ${row.original_ip || 'Unknown'})</span>
-              </td>
-              <td>${row.first_name || 'Unknown'} ${row.last_name || ''} <br> <span style="color:#666">${row.phone_number || row.user_id}</span></td>
-              <td>${new Date(row.last_updated).toLocaleString()}</td>
-              <td class="bytes">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
-              <td class="bytes">${formatBytes(row.network_usage?.total_bytes_received)}</td>
-              <td class="bytes">
-                S: ${formatBytes(row.network_usage?.mobile_bytes_sent)}<br>
-                <span class="sub-text">R: ${formatBytes(row.network_usage?.mobile_bytes_received)}</span>
-              </td>
-              <td class="bytes">
-                S: ${formatBytes(row.network_usage?.wifi_bytes_sent)}<br>
-                <span class="sub-text">R: ${formatBytes(row.network_usage?.wifi_bytes_received)}</span>
-              </td>
-              <td><button class="btn" onclick="showModal(${index})">${window.t ? window.t("View Details") : "View Details"}</button></td>
-            `;
-            netBody.appendChild(tr);
-          });
-        }
-        
-        allBuckets = allNetwork;
-        document.getElementById('ping-count').textContent = `(${allBuckets.length})`;
-        
-        const timeBody = document.getElementById('time-body');
-        timeBody.innerHTML = '';
-        
-        if (allBuckets.length === 0) {
-          timeBody.innerHTML = '<tr><td colspan="6">No historical data yet.</td></tr>';
-        } else {
-          allBuckets.forEach((row, index) => {
-            const tr = document.createElement('tr');
-            
-            let displayName = 'Unknown';
-            if (row.first_name || row.last_name || row.phone_number) {
-              displayName = `${row.first_name || 'Unknown'} ${row.last_name || ''}`.trim() || row.phone_number || row.user_id;
-            } else if (row.telegram_user) {
-              displayName = `${row.telegram_user.first_name || 'Unknown'} ${row.telegram_user.last_name || ''}`.trim() || row.telegram_user.phone_number || row.user_id;
-            } else {
-              displayName = row.user_id;
-            }
-
-            const dt = new Date(row.last_updated || row.timestamp);
-            tr.innerHTML = `
-              <td>
-                <strong style="color: #2980b9;">${row.active_proxy_ip || 'Unknown'}</strong><br>
-                <span style="color:#666; font-size: 11px;">(ori: ${row.original_ip || 'Unknown'})</span>
-              </td>
-              <td>${displayName}</td>
-              <td>
-                <strong>${dt.toLocaleDateString()}</strong><br>
-                <span style="color:#666; font-size:11px;">${dt.toLocaleTimeString()}</span>
-              </td>
-              <td class="bytes" style="color: #2980b9;">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
-              <td class="bytes" style="color: #2ecc71;">${formatBytes(row.network_usage?.total_bytes_received)}</td>
-              <td><button class="btn" onclick="showModal(${index})">${window.t ? window.t("View Details") : "View Details"}</button></td>
-            `;
-            timeBody.appendChild(tr);
-          });
-        }
-        
-        // Initial translation update
-        if (window.updateTranslations) {
-          window.updateTranslations();
-        }
+        allBucketsArray = allNetwork;
+        document.getElementById('ping-count').textContent = `(${allBucketsArray.length})`;
+        renderTimeTable();
 
         const urlParams = new URLSearchParams(window.location.search);
         const highlightUser = urlParams.get('highlightUser');

@@ -1,312 +1,598 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Server Configuration</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 10px; font-size: 14px; }
-        h2 { color: #2c3e50; margin-top: 0; font-size: 18px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-        nav { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        nav a { text-decoration: none; padding: 6px 12px; background: #2c3e50; color: white; border-radius: 4px; font-weight: 500; white-space: nowrap; }
-        .card { background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 15px; margin-bottom: 15px; max-width: 800px; }
-        .form-group { margin-bottom: 12px; }
-        label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: #555; }
-        input[type="text"], input[type="number"], textarea { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 13px; }
-        input[type="text"]:focus, input[type="number"]:focus, textarea:focus { border-color: #3498db; outline: none; box-shadow: 0 0 3px rgba(52,152,219,0.3); }
-        textarea { resize: vertical; min-height: 80px; }
-        .checkbox-group { display: flex; align-items: center; margin-bottom: 15px; }
-        .checkbox-group input { margin-right: 6px; cursor: pointer; }
-        .checkbox-group label { margin-bottom: 0; cursor: pointer; display: inline-block; }
-        
-        .btn { padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
-        .btn:hover { background: #2980b9; }
-        .btn-add { background: #2ecc71; }
-        .btn-add:hover { background: #27ae60; }
-        .btn-danger { background: #e74c3c; padding: 4px 10px; font-size: 14px; line-height: 1; font-weight: bold; }
-        .btn-danger:hover { background: #c0392b; }
-        
-        .notification { margin-top: 10px; padding: 8px 12px; border-radius: 4px; font-size: 13px; display: none; }
-        .notification.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
-        .notification.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background: #f4f7f6;
+        color: #333;
+        margin: 0;
+        padding: 10px;
+        font-size: 14px;
+      }
+      h2 {
+        color: #2c3e50;
+        margin-top: 0;
+        font-size: 18px;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+      }
+      nav {
+        margin-bottom: 15px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      nav a {
+        text-decoration: none;
+        padding: 6px 12px;
+        background: #2c3e50;
+        color: white;
+        border-radius: 4px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .card {
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 15px;
+        margin-bottom: 15px;
+        max-width: 800px;
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 500;
+        font-size: 13px;
+        color: #555;
+      }
+      input[type="text"],
+      input[type="number"],
+      textarea {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        font-family: inherit;
+        font-size: 13px;
+      }
+      input[type="text"]:focus,
+      input[type="number"]:focus,
+      textarea:focus {
+        border-color: #3498db;
+        outline: none;
+        box-shadow: 0 0 3px rgba(52, 152, 219, 0.3);
+      }
+      textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .checkbox-group input {
+        margin-right: 6px;
+        cursor: pointer;
+      }
+      .checkbox-group label {
+        margin-bottom: 0;
+        cursor: pointer;
+        display: inline-block;
+      }
 
-        .endpoint-list { list-style: none; padding: 0; margin: 0; }
-        .endpoint-list li { padding: 8px 0; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; font-size: 13px; }
-        .endpoint-list li:last-child { border-bottom: none; }
-        .method { font-weight: 600; font-size: 11px; padding: 2px 6px; border-radius: 3px; background: #e8f5e9; color: #2e7d32; }
-        .endpoint-list a { color: #3498db; text-decoration: none; font-family: monospace; font-size: 14px; }
-        .endpoint-list a:hover { text-decoration: underline; }
-        .desc { color: #666; margin-left: auto; font-size: 12px; }
-        
-        .ip-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .ip-row { display: flex; align-items: center; gap: 8px; }
-        .ip-index { color: #7f8c8d; font-size: 12px; font-weight: 600; min-width: 20px; text-align: right; }
-        .ip-empty-state { color: #7f8c8d; font-size: 13px; padding: 10px 0; font-style: italic; }
-        
-        .loader { display: none; margin-left: 8px; font-size: 12px; color: #fff; }
-        .loading .loader { display: inline; }
+      .btn {
+        padding: 6px 12px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .btn:hover {
+        background: #2980b9;
+      }
+      .btn-add {
+        background: #2ecc71;
+      }
+      .btn-add:hover {
+        background: #27ae60;
+      }
+      .btn-danger {
+        background: #e74c3c;
+        padding: 4px 10px;
+        font-size: 14px;
+        line-height: 1;
+        font-weight: bold;
+      }
+      .btn-danger:hover {
+        background: #c0392b;
+      }
+
+      .notification {
+        margin-top: 10px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        display: none;
+      }
+      .notification.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+        display: block;
+      }
+      .notification.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        display: block;
+      }
+
+      .endpoint-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .endpoint-list li {
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+      }
+      .endpoint-list li:last-child {
+        border-bottom: none;
+      }
+      .method {
+        font-weight: 600;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .endpoint-list a {
+        color: #3498db;
+        text-decoration: none;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      .endpoint-list a:hover {
+        text-decoration: underline;
+      }
+      .desc {
+        color: #666;
+        margin-left: auto;
+        font-size: 12px;
+      }
+
+      .ip-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .ip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ip-index {
+        color: #7f8c8d;
+        font-size: 12px;
+        font-weight: 600;
+        min-width: 20px;
+        text-align: right;
+      }
+      .ip-empty-state {
+        color: #7f8c8d;
+        font-size: 13px;
+        padding: 10px 0;
+        font-style: italic;
+      }
+
+      .loader {
+        display: none;
+        margin-left: 8px;
+        font-size: 12px;
+        color: #fff;
+      }
+      .loading .loader {
+        display: inline;
+      }
     </style>
     <script src="/i18n.js"></script>
-</head>
-<body>
+  </head>
+  <body>
     <nav>
-        <a href="/user-login-details.html" style="background:#bdc3c7; color:#333;">Recent Logins</a>
-        <a href="/network-usage.html" style="background:#bdc3c7; color:#333;">Network Usage</a>
-        <a href="/xray-stats.html" style="background:#bdc3c7; color:#333;">Xray IP Stats</a>
-        <a href="/analytics.html" style="background:#bdc3c7; color:#333;">Analytics</a>
-        <a href="/configs">App Config</a>
+      <a
+        href="/user-login-details.html"
+        style="background: #bdc3c7; color: #333"
+        >Recent Logins</a
+      >
+      <a href="/network-usage.html" style="background: #bdc3c7; color: #333"
+        >Network Usage</a
+      >
+      <a href="/xray-stats.html" style="background: #bdc3c7; color: #333"
+        >Xray IP Stats</a
+      >
+      <a href="/analytics.html" style="background: #bdc3c7; color: #333"
+        >Analytics</a
+      >
+      <a href="/configs">App Config</a>
     </nav>
 
     <div class="card">
-        <h2>App Version Configuration</h2>
-        <form id="versionForm">
-            <div class="form-group">
-                <label for="versionCode">Version Code</label>
-                <input type="number" id="versionCode" name="versionCode" placeholder="e.g. 6514" required>
-            </div>
-
-            <div class="form-group">
-                <label for="versionName">Version Name</label>
-                <input type="text" id="versionName" name="versionName" placeholder="e.g. 12.4.5" required>
-            </div>
-
-            <div class="form-group">
-                <label for="downloadUrl">Download URL</label>
-                <input type="text" id="downloadUrl" name="downloadUrl" placeholder="https://..." required>
-            </div>
-
-            <div class="form-group">
-                <label for="changelog">Changelog</label>
-                <textarea id="changelog" name="changelog" placeholder="Enter changelog details..." required></textarea>
-            </div>
-
-            <div class="checkbox-group">
-                <input type="checkbox" id="forceUpdate" name="forceUpdate">
-                <label for="forceUpdate">Require Force Update</label>
-            </div>
-
-            <button type="submit" id="submitBtn" class="btn">
-                Save Configuration
-                <span class="loader">(Saving...)</span>
-            </button>
-        </form>
-        <div id="notification" class="notification"></div>
-    </div>
-
-    <div class="card">
-        <h2>Transit Node IPs</h2>
-        <p style="color: #666; margin-top: -10px; margin-bottom: 15px; font-size: 12px;">Manage the list of transit node IPs served at <code>/transit-ips</code></p>
-        <div id="ipList" class="ip-list">
-            <div class="ip-empty-state">Loading...</div>
+      <h2>App Version Configuration</h2>
+      <h3>v1.0</h3>
+      <form id="versionForm">
+        <div class="form-group">
+          <label for="versionCode">Version Code</label>
+          <input
+            type="number"
+            id="versionCode"
+            name="versionCode"
+            placeholder="e.g. 6514"
+            required
+          />
         </div>
-        <button type="button" class="btn btn-add" id="addIpBtn" onclick="addIpRow('')">
-            + Add IP Address
+
+        <div class="form-group">
+          <label for="versionName">Version Name</label>
+          <input
+            type="text"
+            id="versionName"
+            name="versionName"
+            placeholder="e.g. 12.4.5"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="downloadUrl">Download URL</label>
+          <input
+            type="text"
+            id="downloadUrl"
+            name="downloadUrl"
+            placeholder="https://..."
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="changelog">Changelog</label>
+          <textarea
+            id="changelog"
+            name="changelog"
+            placeholder="Enter changelog details..."
+            required
+          ></textarea>
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="forceUpdate" name="forceUpdate" />
+          <label for="forceUpdate">Require Force Update</label>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn">
+          Save Configuration
+          <span class="loader">(Saving...)</span>
         </button>
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-            <label for="transitRemarks" style="font-weight: 600; margin-bottom: 5px; display: block; font-size: 13px;">Remarks / Scratchpad</label>
-            <textarea id="transitRemarks" placeholder="Paste notes, older IPs, or scratchpad text here... This is for your own reference." style="width: 100%; min-height: 80px;"></textarea>
-        </div>
-
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-            <button type="button" id="saveIpsBtn" class="btn" onclick="saveTransitIps()">
-                Save Transit IPs & Remarks
-                <span class="loader">(Saving...)</span>
-            </button>
-        </div>
-        <div id="ipNotification" class="notification"></div>
+      </form>
+      <div id="notification" class="notification"></div>
     </div>
 
     <div class="card">
-        <h2>Available Endpoints</h2>
-        <ul class="endpoint-list">
-            <li><span class="method get">GET</span> <a href="/proxies" target="_blank">/proxies</a> <span class="desc">Available MTProto proxies</span></li>
-            <li><span class="method get">GET</span> <a href="/transit-ips" target="_blank">/transit-ips</a> <span class="desc">Active Transit Node IPs</span></li>
-            <li><span class="method get">GET</span> <a href="/api/android/version" target="_blank">/api/android/version</a> <span class="desc">App version metadata</span></li>
-            <li><span class="method get">GET</span> <a href="/health" target="_blank">/health</a> <span class="desc">Health check</span></li>
-            <li><span class="method get">GET</span> <a href="/api/telemetry/stats" target="_blank">/api/telemetry/stats</a> <span class="desc">Telemetry stats</span></li>
-        </ul>
+      <h2>Transit Node IPs</h2>
+      <p
+        style="
+          color: #666;
+          margin-top: -10px;
+          margin-bottom: 15px;
+          font-size: 12px;
+        "
+      >
+        Manage the list of transit node IPs served at <code>/transit-ips</code>
+      </p>
+      <div id="ipList" class="ip-list">
+        <div class="ip-empty-state">Loading...</div>
+      </div>
+      <button
+        type="button"
+        class="btn btn-add"
+        id="addIpBtn"
+        onclick="addIpRow('')"
+      >
+        + Add IP Address
+      </button>
+      <div
+        style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee"
+      >
+        <label
+          for="transitRemarks"
+          style="
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: block;
+            font-size: 13px;
+          "
+          >Remarks / Scratchpad</label
+        >
+        <textarea
+          id="transitRemarks"
+          placeholder="Paste notes, older IPs, or scratchpad text here... This is for your own reference."
+          style="width: 100%; min-height: 80px"
+        ></textarea>
+      </div>
+
+      <div
+        style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee"
+      >
+        <button
+          type="button"
+          id="saveIpsBtn"
+          class="btn"
+          onclick="saveTransitIps()"
+        >
+          Save Transit IPs & Remarks
+          <span class="loader">(Saving...)</span>
+        </button>
+      </div>
+      <div id="ipNotification" class="notification"></div>
+    </div>
+
+    <div class="card">
+      <h2>Available Endpoints</h2>
+      <ul class="endpoint-list">
+        <li>
+          <span class="method get">GET</span>
+          <a href="/proxies" target="_blank">/proxies</a>
+          <span class="desc">Available MTProto proxies</span>
+        </li>
+        <li>
+          <span class="method get">GET</span>
+          <a href="/transit-ips" target="_blank">/transit-ips</a>
+          <span class="desc">Active Transit Node IPs</span>
+        </li>
+        <li>
+          <span class="method get">GET</span>
+          <a href="/api/android/version" target="_blank"
+            >/api/android/version</a
+          >
+          <span class="desc">App version metadata</span>
+        </li>
+        <li>
+          <span class="method get">GET</span>
+          <a href="/health" target="_blank">/health</a>
+          <span class="desc">Health check</span>
+        </li>
+        <li>
+          <span class="method get">GET</span>
+          <a href="/api/telemetry/stats" target="_blank"
+            >/api/telemetry/stats</a
+          >
+          <span class="desc">Telemetry stats</span>
+        </li>
+      </ul>
     </div>
 
     <script>
-        // ===== VERSION CONFIG =====
-        document.addEventListener('DOMContentLoaded', async () => {
-            const form = document.getElementById('versionForm');
-            const submitBtn = document.getElementById('submitBtn');
-            const notification = document.getElementById('notification');
+      // ===== VERSION CONFIG =====
+      document.addEventListener("DOMContentLoaded", async () => {
+        const form = document.getElementById("versionForm");
+        const submitBtn = document.getElementById("submitBtn");
+        const notification = document.getElementById("notification");
 
-            // Fetch current config
-            try {
-                const response = await fetch('/api/android/version');
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('versionCode').value = data.versionCode || '';
-                    document.getElementById('versionName').value = data.versionName || '';
-                    document.getElementById('downloadUrl').value = data.downloadUrl || '';
-                    document.getElementById('changelog').value = data.changelog || '';
-                    document.getElementById('forceUpdate').checked = data.forceUpdate || false;
-                } else {
-                    showNotification('Failed to load current version data.', 'error');
-                }
-            } catch (error) {
-                console.error('Error fetching version:', error);
-                showNotification('Error loading configuration.', 'error');
-            }
-
-            // Handle form submission
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                submitBtn.classList.add('loading');
-                submitBtn.disabled = true;
-                
-                const payload = {
-                    versionCode: parseInt(document.getElementById('versionCode').value, 10),
-                    versionName: document.getElementById('versionName').value,
-                    downloadUrl: document.getElementById('downloadUrl').value,
-                    changelog: document.getElementById('changelog').value,
-                    forceUpdate: document.getElementById('forceUpdate').checked
-                };
-
-                try {
-                    const response = await fetch('/api/android/version', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        showNotification('Configuration saved successfully!', 'success');
-                    } else {
-                        showNotification('Failed to save configuration.', 'error');
-                    }
-                } catch (error) {
-                    console.error('Error saving version:', error);
-                    showNotification('Error saving configuration.', 'error');
-                } finally {
-                    submitBtn.classList.remove('loading');
-                    submitBtn.disabled = false;
-                }
-            });
-
-            function showNotification(message, type) {
-                notification.textContent = message;
-                notification.className = `notification ${type}`;
-                
-                setTimeout(() => {
-                    notification.className = 'notification';
-                }, 4000);
-            }
-
-            // ===== TRANSIT IPS =====
-            await loadTransitIps();
-        });
-
-        // Transit IPs management
-        async function loadTransitIps() {
-            const ipList = document.getElementById('ipList');
-            try {
-                const response = await fetch('/api/transit-ips');
-                if (response.ok) {
-                    const data = await response.json();
-                    ipList.innerHTML = '';
-                    if (data.ips && data.ips.length > 0) {
-                        data.ips.forEach(ip => addIpRow(ip));
-                    } else {
-                        ipList.innerHTML = '<div class="ip-empty-state">No transit IPs configured. Click "+ Add IP Address" to get started.</div>';
-                    }
-                    if (data.remarks !== undefined) {
-                        document.getElementById('transitRemarks').value = data.remarks;
-                    }
-                } else {
-                    ipList.innerHTML = '<div class="ip-empty-state">Failed to load transit IPs.</div>';
-                }
-            } catch (error) {
-                console.error('Error loading transit IPs:', error);
-                ipList.innerHTML = '<div class="ip-empty-state">Error loading transit IPs.</div>';
-            }
+        // Fetch current config
+        try {
+          const response = await fetch("/api/android/version");
+          if (response.ok) {
+            const data = await response.json();
+            document.getElementById("versionCode").value =
+              data.versionCode || "";
+            document.getElementById("versionName").value =
+              data.versionName || "";
+            document.getElementById("downloadUrl").value =
+              data.downloadUrl || "";
+            document.getElementById("changelog").value = data.changelog || "";
+            document.getElementById("forceUpdate").checked =
+              data.forceUpdate || false;
+          } else {
+            showNotification(window.t("Failed to load current version data."), "error");
+          }
+        } catch (error) {
+          console.error("Error fetching version:", error);
+          showNotification(window.t("Error loading configuration."), "error");
         }
 
-        function addIpRow(value) {
-            const ipList = document.getElementById('ipList');
-            // Clear empty state if present
-            const emptyState = ipList.querySelector('.ip-empty-state');
-            if (emptyState) emptyState.remove();
+        // Handle form submission
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
 
-            const row = document.createElement('div');
-            row.className = 'ip-row';
-            const index = ipList.querySelectorAll('.ip-row').length + 1;
-            row.innerHTML = `
+          submitBtn.classList.add("loading");
+          submitBtn.disabled = true;
+
+          const payload = {
+            versionCode: parseInt(
+              document.getElementById("versionCode").value,
+              10,
+            ),
+            versionName: document.getElementById("versionName").value,
+            downloadUrl: document.getElementById("downloadUrl").value,
+            changelog: document.getElementById("changelog").value,
+            forceUpdate: document.getElementById("forceUpdate").checked,
+          };
+
+          try {
+            const response = await fetch("/api/android/version", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+              showNotification(window.t("Configuration saved successfully!"), "success");
+            } else {
+              showNotification(window.t("Failed to save configuration."), "error");
+            }
+          } catch (error) {
+            console.error("Error saving version:", error);
+            showNotification(window.t("Error loading configuration."), "error");
+          } finally {
+            submitBtn.classList.remove("loading");
+            submitBtn.disabled = false;
+          }
+        });
+
+        function showNotification(message, type) {
+          notification.textContent = message;
+          notification.className = `notification ${type}`;
+
+          setTimeout(() => {
+            notification.className = "notification";
+          }, 4000);
+        }
+
+        // ===== TRANSIT IPS =====
+        await loadTransitIps();
+      });
+
+      // Transit IPs management
+      async function loadTransitIps() {
+        const ipList = document.getElementById("ipList");
+        try {
+          const response = await fetch("/api/transit-ips");
+          if (response.ok) {
+            const data = await response.json();
+            ipList.innerHTML = "";
+            if (data.ips && data.ips.length > 0) {
+              data.ips.forEach((ip) => addIpRow(ip));
+            } else {
+              ipList.innerHTML =
+                '<div class="ip-empty-state">No transit IPs configured. Click "+ Add IP Address" to get started.</div>';
+            }
+            if (data.remarks !== undefined) {
+              document.getElementById("transitRemarks").value = data.remarks;
+            }
+          } else {
+            ipList.innerHTML =
+              '<div class="ip-empty-state">' + window.t("Failed to load transit IPs.") + '</div>';
+          }
+        } catch (error) {
+          console.error("Error loading transit IPs:", error);
+          ipList.innerHTML =
+            '<div class="ip-empty-state">' + window.t("Error loading transit IPs.") + '</div>';
+        }
+      }
+
+      function addIpRow(value) {
+        const ipList = document.getElementById("ipList");
+        // Clear empty state if present
+        const emptyState = ipList.querySelector(".ip-empty-state");
+        if (emptyState) emptyState.remove();
+
+        const row = document.createElement("div");
+        row.className = "ip-row";
+        const index = ipList.querySelectorAll(".ip-row").length + 1;
+        row.innerHTML = `
                 <span class="ip-index">${index}.</span>
                 <input type="text" class="transit-ip-input" value="${value}" placeholder="e.g. 95.40.68.126">
                 <button type="button" class="btn btn-danger" onclick="removeIpRow(this)" title="Remove">&times;</button>
             `;
-            ipList.appendChild(row);
+        ipList.appendChild(row);
+      }
+
+      function removeIpRow(btn) {
+        const row = btn.closest(".ip-row");
+        row.style.opacity = "0";
+        row.style.transform = "translateX(20px)";
+        row.style.transition = "all 0.2s ease";
+        setTimeout(() => {
+          row.remove();
+          reindexIpRows();
+          const ipList = document.getElementById("ipList");
+          if (ipList.querySelectorAll(".ip-row").length === 0) {
+            ipList.innerHTML =
+              '<div class="ip-empty-state">' + window.t('No transit IPs configured. Click "+ Add IP Address" to get started.') + '</div>';
+          }
+        }, 200);
+      }
+
+      function reindexIpRows() {
+        const rows = document.querySelectorAll(".ip-row");
+        rows.forEach((row, i) => {
+          row.querySelector(".ip-index").textContent = i + 1;
+        });
+      }
+
+      async function saveTransitIps() {
+        const saveBtn = document.getElementById("saveIpsBtn");
+        const ipNotification = document.getElementById("ipNotification");
+        const inputs = document.querySelectorAll(".transit-ip-input");
+        const ips = Array.from(inputs)
+          .map((input) => input.value.trim())
+          .filter((ip) => ip.length > 0);
+        const remarks = document.getElementById("transitRemarks").value;
+
+        saveBtn.classList.add("loading");
+        saveBtn.disabled = true;
+
+        try {
+          const response = await fetch("/api/transit-ips", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ips, remarks }),
+          });
+
+          if (response.ok) {
+            const prefix = window.t("Transit IPs & Remarks saved successfully!");
+            showIpNotification(
+              `${prefix} (${ips.length} IP${ips.length !== 1 ? "s" : ""})`,
+              "success",
+            );
+          } else {
+            showIpNotification(window.t("Failed to save transit IPs."), "error");
+          }
+        } catch (error) {
+          console.error("Error saving transit IPs:", error);
+          showIpNotification(window.t("Error saving transit IPs."), "error");
+        } finally {
+          saveBtn.classList.remove("loading");
+          saveBtn.disabled = false;
         }
+      }
 
-        function removeIpRow(btn) {
-            const row = btn.closest('.ip-row');
-            row.style.opacity = '0';
-            row.style.transform = 'translateX(20px)';
-            row.style.transition = 'all 0.2s ease';
-            setTimeout(() => {
-                row.remove();
-                reindexIpRows();
-                const ipList = document.getElementById('ipList');
-                if (ipList.querySelectorAll('.ip-row').length === 0) {
-                    ipList.innerHTML = '<div class="ip-empty-state">No transit IPs configured. Click "Add IP Address" to get started.</div>';
-                }
-            }, 200);
-        }
-
-        function reindexIpRows() {
-            const rows = document.querySelectorAll('.ip-row');
-            rows.forEach((row, i) => {
-                row.querySelector('.ip-index').textContent = i + 1;
-            });
-        }
-
-        async function saveTransitIps() {
-            const saveBtn = document.getElementById('saveIpsBtn');
-            const ipNotification = document.getElementById('ipNotification');
-            const inputs = document.querySelectorAll('.transit-ip-input');
-            const ips = Array.from(inputs).map(input => input.value.trim()).filter(ip => ip.length > 0);
-            const remarks = document.getElementById('transitRemarks').value;
-
-            saveBtn.classList.add('loading');
-            saveBtn.disabled = true;
-
-            try {
-                const response = await fetch('/api/transit-ips', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ips, remarks })
-                });
-
-                if (response.ok) {
-                    showIpNotification(`Transit IPs & Remarks saved successfully! (${ips.length} IP${ips.length !== 1 ? 's' : ''})`, 'success');
-                } else {
-                    showIpNotification('Failed to save transit IPs.', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving transit IPs:', error);
-                showIpNotification('Error saving transit IPs.', 'error');
-            } finally {
-                saveBtn.classList.remove('loading');
-                saveBtn.disabled = false;
-            }
-        }
-
-        function showIpNotification(message, type) {
-            const ipNotification = document.getElementById('ipNotification');
-            ipNotification.textContent = message;
-            ipNotification.className = `notification ${type}`;
-            setTimeout(() => {
-                ipNotification.className = 'notification';
-            }, 4000);
-        }
+      function showIpNotification(message, type) {
+        const ipNotification = document.getElementById("ipNotification");
+        ipNotification.textContent = message;
+        ipNotification.className = `notification ${type}`;
+        setTimeout(() => {
+          ipNotification.className = "notification";
+        }, 4000);
+      }
     </script>
-</body>
+  </body>
 </html>

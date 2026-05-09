@@ -384,8 +384,8 @@ app.post('/network-usage', async (req, res) => {
 app.get('/api/telemetry/stats', async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   try {
-    const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(100);
-    const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).limit(500).lean();
+    const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(5000);
+    const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).limit(5000).lean();
     
     // Attach phone number from latest login to network data
     const network = await Promise.all(networkRaw.map(async (net) => {
@@ -454,20 +454,59 @@ app.get('/api/telemetry/all-buckets', async (req, res) => {
  */
 app.get('/api/telemetry/daily-stats', async (req, res) => {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayStart = new Date(todayStr);
-    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const { timeframe = 'today' } = req.query;
+    let query = {};
+    const now = new Date();
+    let startTime, endTime;
+    let timeRangeText = "";
 
-    const dailyActiveUsersRaw = await NetworkTelemetry.distinct("user_id", { last_updated: { $gte: todayStart, $lt: tomorrowStart } });
-    const dailyActiveUsers = dailyActiveUsersRaw.length;
+    if (timeframe === 'today') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+      timeRangeText = `Today (${startTime.toLocaleDateString()})`;
+    } else if (timeframe === 'yesterday') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+      timeRangeText = `Yesterday (${startTime.toLocaleDateString()})`;
+    } else if (timeframe === 'this_week') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Sunday
+      endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+      timeRangeText = `This Week (${startTime.toLocaleDateString()} - ${now.toLocaleDateString()})`;
+    } else if (timeframe === 'last_hour') {
+      startTime = new Date(now.getTime() - 60 * 60 * 1000);
+      endTime = now;
+      query.last_updated = { $gte: startTime, $lte: endTime };
+      timeRangeText = `Last Hour (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
+    } else { // all_time
+      timeRangeText = "All Time";
+    }
+
+    let dailyActiveUsers = 0;
+    let dailyNewUsers = 0;
+
+    if (timeframe === 'all_time') {
+      const allUsers = await NetworkTelemetry.distinct("user_id");
+      dailyActiveUsers = allUsers.length;
+    } else {
+      const activeRaw = await NetworkTelemetry.distinct("user_id", query);
+      dailyActiveUsers = activeRaw.length;
+    }
 
     const totalUsersRaw = await NetworkTelemetry.distinct("user_id");
     const totalUsers = totalUsersRaw.length;
 
-    const firstLogins = await LoginTelemetry.aggregate([
-      { $group: { _id: "$telegram_user.user_id", first_login: { $min: "$timestamp" } } }
+    const firstPings = await NetworkTelemetry.aggregate([
+      { $group: { _id: "$user_id", first_ping: { $min: "$last_updated" } } }
     ]);
-    const dailyNewUsers = firstLogins.filter(u => u.first_login && u.first_login >= todayStart && u.first_login < tomorrowStart).length;
+    
+    if (timeframe === 'all_time') {
+      dailyNewUsers = totalUsers;
+    } else {
+      dailyNewUsers = firstPings.filter(u => u.first_ping && u.first_ping >= startTime && u.first_ping < endTime).length;
+    }
 
     const statsRaw = await NetworkTelemetry.aggregate([
       { $group: {
@@ -495,19 +534,28 @@ app.get('/api/telemetry/daily-stats', async (req, res) => {
       };
     });
 
-    const todayStatsRaw = await NetworkTelemetry.aggregate([
-      { $match: { last_updated: { $gte: todayStart, $lt: tomorrowStart } } },
-      { $group: {
-          _id: "$user_id",
-          today_sent: { $sum: "$delta_sent" },
-          today_received: { $sum: "$delta_received" }
-      }}
-    ]);
+    let periodStatsRaw;
+    if (timeframe === 'all_time') {
+      periodStatsRaw = statsRaw.map(s => ({
+          _id: s._id,
+          today_sent: s.total_sent,
+          today_received: s.total_received
+      }));
+    } else {
+      periodStatsRaw = await NetworkTelemetry.aggregate([
+        { $match: query },
+        { $group: {
+            _id: "$user_id",
+            today_sent: { $sum: "$delta_sent" },
+            today_received: { $sum: "$delta_received" }
+        }}
+      ]);
+    }
 
     let sumDailySent = 0;
     let sumDailyReceived = 0;
 
-    todayStatsRaw.forEach(userStat => {
+    periodStatsRaw.forEach(userStat => {
       sumDailySent += userStat.today_sent || 0;
       sumDailyReceived += userStat.today_received || 0;
     });
@@ -520,10 +568,10 @@ app.get('/api/telemetry/daily-stats', async (req, res) => {
     let topUsers = Object.values(userTrafficMap).sort((a, b) => b.total_traffic - a.total_traffic).slice(0, 20);
     
     topUsers = topUsers.map(tu => {
-       const userFirstLogin = firstLogins.find(fl => fl._id === tu.user_id);
+       const userFirstPing = firstPings.find(fp => fp._id === tu.user_id);
        let usageDays = 0;
-       if (userFirstLogin && userFirstLogin.first_login) {
-           const diffTime = Math.abs(new Date() - new Date(userFirstLogin.first_login));
+       if (userFirstPing && userFirstPing.first_ping) {
+           const diffTime = Math.abs(new Date() - new Date(userFirstPing.first_ping));
            usageDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
        }
        return { ...tu, usage_days: usageDays || 1 };
@@ -537,7 +585,8 @@ app.get('/api/telemetry/daily-stats', async (req, res) => {
       avgTotalReceived,
       avgDailySent,
       avgDailyReceived,
-      topUsers
+      topUsers,
+      timeRangeText
     });
   } catch (error) {
     console.error('Daily Stats Error:', error);

@@ -92,7 +92,16 @@
         const res = await fetch('/api/telemetry/xray-stats?timeframe=' + filter);
         const data = await res.json();
         
-        document.getElementById('timeRangeText').textContent = data.timeRangeText || '';
+        let rawText = data.timeRangeText || '';
+        if (typeof window.t === 'function' && rawText) {
+          const match = rawText.match(/^(.+?)\s+(\(.*\))$/);
+          if (match) {
+             rawText = `${window.t(match[1])} ${match[2]}`;
+          } else {
+             rawText = window.t(rawText);
+          }
+        }
+        document.getElementById('timeRangeText').textContent = rawText;
         const xrayArray = data.results || [];
         
         tbody.innerHTML = '';

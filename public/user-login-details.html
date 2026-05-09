@@ -49,18 +49,26 @@
       <table style="min-width: 600px;">
         <thead>
           <tr>
-            <th>Network IPs</th>
-            <th>Time</th>
-            <th>User</th>
-            <th>Device</th>
-            <th>VPN?</th>
-            <th>Details</th>
+            <th data-i18n>Network IPs</th>
+            <th data-i18n>Time</th>
+            <th data-i18n>User</th>
+            <th data-i18n>Device</th>
+            <th data-i18n>VPN?</th>
+            <th data-i18n>Details</th>
           </tr>
         </thead>
         <tbody id="logins-body">
           <tr><td colspan="7">Loading...</td></tr>
         </tbody>
       </table>
+    </div>
+    <div id="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-top: 1px solid #ddd; display: none;">
+      <div>
+        <button class="btn" onclick="prevPage()">Previous</button>
+        <span id="page-info" style="margin: 0 15px; font-weight: bold;">Page 1</span>
+        <button class="btn" onclick="nextPage()">Next</button>
+      </div>
+      <div id="total-info" style="color: #666; font-size: 13px;"></div>
     </div>
   </div>
 
@@ -74,6 +82,66 @@
 
   <script>
     let allLogins = [];
+    let currentPage = 1;
+    const itemsPerPage = 50;
+
+    function renderTable() {
+        const loginsBody = document.getElementById('logins-body');
+        loginsBody.innerHTML = '';
+        if (allLogins.length === 0) {
+          loginsBody.innerHTML = '<tr><td colspan="7">No logins recorded yet.</td></tr>';
+          document.getElementById('pagination-controls').style.display = 'none';
+          return;
+        }
+        
+        document.getElementById('pagination-controls').style.display = 'flex';
+        const totalPages = Math.ceil(allLogins.length / itemsPerPage);
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById('total-info').textContent = `Total Records: ${allLogins.length}`;
+
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedData = allLogins.slice(startIndex, endIndex);
+
+        paginatedData.forEach((row, i) => {
+            const actualIndex = startIndex + i;
+            const tr = document.createElement('tr');
+            const user = row.telegram_user || {};
+            const dev = row.device_info || {};
+            const net = row.network_info || {};
+            
+            const rawTimestamp = (row.timestamp || "").replace("Z", "");
+            const timeGmt8 = new Date(rawTimestamp).toLocaleString("en-US", { hour12: true });
+
+            tr.innerHTML = `
+              <td>Orig: ${net.original_ip || 'N/A'}<br><span style="color:#666">Proxy: ${net.active_proxy_ip || 'N/A'}</span></td>
+              <td>${timeGmt8}</td>
+              <td>${user.first_name || ''} ${user.last_name || ''} <br> <span style="color:#666">${user.phone_number || ''}</span></td>
+              <td>${dev.manufacturer || ''} ${dev.model || ''} ${dev.is_emulator ? '<span class="badge badge-false" style="margin-left:4px;">Emulator</span>' : ''} <br> <span style="color:#666">Android ${dev.os_version || ''}</span></td>
+              <td><span class="badge badge-${net.is_using_vpn}">${net.is_using_vpn ? 'YES' : 'NO'}</span></td>
+              <td><button class="btn" onclick="showModal(${actualIndex})">View Details</button></td>
+            `;
+            loginsBody.appendChild(tr);
+        });
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderTable();
+      }
+    }
+
+    function nextPage() {
+      const totalPages = Math.ceil(allLogins.length / itemsPerPage);
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderTable();
+      }
+    }
 
     function showModal(index) {
       const data = allLogins[index];
@@ -102,34 +170,7 @@
         const res = await fetch('/api/telemetry/stats');
         const data = await res.json();
         allLogins = data.logins;
-        
-        const loginsBody = document.getElementById('logins-body');
-        loginsBody.innerHTML = '';
-        if (allLogins.length === 0) {
-          loginsBody.innerHTML = '<tr><td colspan="7">No logins recorded yet.</td></tr>';
-        } else {
-          allLogins.forEach((row, index) => {
-            const tr = document.createElement('tr');
-            const user = row.telegram_user || {};
-            const dev = row.device_info || {};
-            const net = row.network_info || {};
-            
-            // The Android app sends local time but incorrectly appends 'Z' (UTC).
-            // By stripping the 'Z', JavaScript treats it as local time.
-            const rawTimestamp = (row.timestamp || "").replace("Z", "");
-            const timeGmt8 = new Date(rawTimestamp).toLocaleString("en-US", { hour12: true });
-
-            tr.innerHTML = `
-              <td>Orig: ${net.original_ip || 'N/A'}<br><span style="color:#666">Proxy: ${net.active_proxy_ip || 'N/A'}</span></td>
-              <td>${timeGmt8}</td>
-              <td>${user.first_name || ''} ${user.last_name || ''} <br> <span style="color:#666">${user.phone_number || ''}</span></td>
-              <td>${dev.manufacturer || ''} ${dev.model || ''} ${dev.is_emulator ? '<span class="badge badge-false" style="margin-left:4px;">Emulator</span>' : ''} <br> <span style="color:#666">Android ${dev.os_version || ''}</span></td>
-              <td><span class="badge badge-${net.is_using_vpn}">${net.is_using_vpn ? 'YES' : 'NO'}</span></td>
-              <td><button class="btn" onclick="showModal(${index})">View Details</button></td>
-            `;
-            loginsBody.appendChild(tr);
-          });
-        }
+        renderTable();
       } catch (err) {
         console.error(err);
       }
