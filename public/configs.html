@@ -246,7 +246,7 @@
 
     <div class="card">
       <h2>App Version Configuration</h2>
-      <h3>v1.0</h3>
+      <h3>v1.1</h3>
       <form id="versionForm">
         <div class="form-group">
           <label for="versionCode">Version Code</label>
@@ -420,7 +420,10 @@
             document.getElementById("forceUpdate").checked =
               data.forceUpdate || false;
           } else {
-            showNotification(window.t("Failed to load current version data."), "error");
+            showNotification(
+              window.t("Failed to load current version data."),
+              "error",
+            );
           }
         } catch (error) {
           console.error("Error fetching version:", error);
@@ -455,9 +458,15 @@
             });
 
             if (response.ok) {
-              showNotification(window.t("Configuration saved successfully!"), "success");
+              showNotification(
+                window.t("Configuration saved successfully!"),
+                "success",
+              );
             } else {
-              showNotification(window.t("Failed to save configuration."), "error");
+              showNotification(
+                window.t("Failed to save configuration."),
+                "error",
+              );
             }
           } catch (error) {
             console.error("Error saving version:", error);
@@ -500,12 +509,16 @@
             }
           } else {
             ipList.innerHTML =
-              '<div class="ip-empty-state">' + window.t("Failed to load transit IPs.") + '</div>';
+              '<div class="ip-empty-state">' +
+              window.t("Failed to load transit IPs.") +
+              "</div>";
           }
         } catch (error) {
           console.error("Error loading transit IPs:", error);
           ipList.innerHTML =
-            '<div class="ip-empty-state">' + window.t("Error loading transit IPs.") + '</div>';
+            '<div class="ip-empty-state">' +
+            window.t("Error loading transit IPs.") +
+            "</div>";
         }
       }
 
@@ -537,7 +550,11 @@
           const ipList = document.getElementById("ipList");
           if (ipList.querySelectorAll(".ip-row").length === 0) {
             ipList.innerHTML =
-              '<div class="ip-empty-state">' + window.t('No transit IPs configured. Click "+ Add IP Address" to get started.') + '</div>';
+              '<div class="ip-empty-state">' +
+              window.t(
+                'No transit IPs configured. Click "+ Add IP Address" to get started.',
+              ) +
+              "</div>";
           }
         }, 200);
       }
@@ -569,13 +586,18 @@
           });
 
           if (response.ok) {
-            const prefix = window.t("Transit IPs & Remarks saved successfully!");
+            const prefix = window.t(
+              "Transit IPs & Remarks saved successfully!",
+            );
             showIpNotification(
               `${prefix} (${ips.length} IP${ips.length !== 1 ? "s" : ""})`,
               "success",
             );
           } else {
-            showIpNotification(window.t("Failed to save transit IPs."), "error");
+            showIpNotification(
+              window.t("Failed to save transit IPs."),
+              "error",
+            );
           }
         } catch (error) {
           console.error("Error saving transit IPs:", error);
