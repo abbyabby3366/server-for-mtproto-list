@@ -20,6 +20,7 @@
     .users-list span { display: inline-block; background: #eee; padding: 2px 4px; border-radius: 3px; margin: 2px; }
   </style>
   <script src="/i18n.js"></script>
+  <script src="/auth.js"></script>
 </head>
 <body>
   <nav>
@@ -36,13 +37,18 @@
         <h2 style="margin:0;" data-i18n>Active Xray Proxy Servers</h2>
         <span id="timeRangeText" style="font-size: 13px; color: #7f8c8d; font-weight: 500;"></span>
       </div>
-      <div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <select id="pingFilter" onchange="loadData()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc;">
+          <option value="true" data-i18n selected>Latest Ping</option>
+          <option value="false" data-i18n>All Pings</option>
+        </select>
         <select id="timeFilter" onchange="loadData()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc;">
-          <option value="last_hour">Last Hour</option>
-          <option value="today" selected>Today</option>
-          <option value="yesterday">Yesterday</option>
-          <option value="this_week">This Week</option>
-          <option value="all_time">All Time</option>
+          <option value="last_15_mins" data-i18n selected>Last 15 Mins</option>
+          <option value="last_hour" data-i18n>Last Hour</option>
+          <option value="today" data-i18n>Today</option>
+          <option value="yesterday" data-i18n>Yesterday</option>
+          <option value="this_week" data-i18n>This Week</option>
+          <option value="all_time" data-i18n>All Time</option>
         </select>
       </div>
     </div>
@@ -89,7 +95,8 @@
         }
 
         const filter = document.getElementById('timeFilter').value;
-        const res = await fetch('/api/telemetry/xray-stats?timeframe=' + filter);
+        const latestPing = document.getElementById('pingFilter').value;
+        const res = await fetch(`/api/telemetry/xray-stats?timeframe=${filter}&latestPing=${latestPing}`);
         const data = await res.json();
         
         let rawText = data.timeRangeText || '';

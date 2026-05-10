@@ -4,6 +4,8 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -66,10 +68,56 @@ const transitIpsSchema = new mongoose.Schema({
 });
 const TransitIps = mongoose.model('TransitIps', transitIpsSchema);
 
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'staff'], default: 'staff' }
+});
+const User = mongoose.model('User', userSchema);
+
+// Initialize default admin if no users exist
+mongoose.connection.once('open', async () => {
+  try {
+    const count = await User.countDocuments();
+    if (count === 0) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await User.create({ username: 'admin', password: hashedPassword, role: 'admin' });
+      console.log('Created default admin user: admin / admin123');
+    }
+  } catch (err) {
+    console.error('Error initializing default admin:', err);
+  }
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+
+// Authentication Middleware
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const jwtSecret = process.env.JWT_SECRET || 'default_jwt_secret_change_me_in_env';
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = decoded; // { id, username, role }
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ error: 'Forbidden: Requires admin role' });
+  }
+};
 
 // Optional API key authentication
 const apiKeyAuth = (req, res, next) => {
@@ -123,6 +171,85 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// --- Auth Endpoints ---
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+    const jwtSecret = process.env.JWT_SECRET || 'default_jwt_secret_change_me_in_env';
+    const token = jwt.sign(
+      { id: user._id, username: user.username, role: user.role },
+      jwtSecret,
+      { expiresIn: '24h' }
+    );
+    res.json({ token, user: { username: user.username, role: user.role } });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// --- User Management Endpoints (Admin Only) ---
+app.get('/api/users', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const users = await User.find({}, { password: 0 });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/users', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { username, password, role } = req.body;
+    if (!username || !password || !role) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const existing = await User.findOne({ username });
+    if (existing) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({ username, password: hashedPassword, role });
+    await user.save();
+    res.status(201).json({ message: 'User created' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.delete('/api/users/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    // Prevent deleting oneself
+    if (req.user.id === req.params.id) {
+      return res.status(400).json({ error: 'Cannot delete yourself' });
+    }
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.put('/api/users/:id/password', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Password required' });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await User.findByIdAndUpdate(req.params.id, { password: hashedPassword });
+    res.json({ message: 'Password updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 /**
  * GET /transit-ips
  * Returns a list of active Transit Node IPs from MongoDB (falls back to local JSON).
@@ -148,7 +275,7 @@ app.get('/transit-ips', async (req, res) => {
  * GET /api/transit-ips
  * Returns the transit IPs config for the UI.
  */
-app.get('/api/transit-ips', async (req, res) => {
+app.get('/api/transit-ips', verifyToken, async (req, res) => {
   try {
     const record = await TransitIps.findOne();
     if (record) {
@@ -174,7 +301,7 @@ app.get('/api/transit-ips', async (req, res) => {
  * POST /api/transit-ips
  * Updates the transit IPs list in MongoDB.
  */
-app.post('/api/transit-ips', async (req, res) => {
+app.post('/api/transit-ips', verifyToken, async (req, res) => {
   try {
     const { ips, remarks } = req.body;
     if (!Array.isArray(ips)) {
@@ -381,7 +508,7 @@ app.post('/network-usage', async (req, res) => {
 /**
  * GET /api/telemetry/stats (for the frontend dashboard)
  */
-app.get('/api/telemetry/stats', async (req, res) => {
+app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   try {
     const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(5000);
@@ -422,7 +549,7 @@ app.get('/api/telemetry/stats', async (req, res) => {
  * GET /api/telemetry/all-buckets
  * Fetches all daily buckets sorted chronologically
  */
-app.get('/api/telemetry/all-buckets', async (req, res) => {
+app.get('/api/telemetry/all-buckets', verifyToken, async (req, res) => {
   try {
     const buckets = await NetworkDailyBucket.find().sort({ date: -1, last_updated: -1 }).limit(1000).lean();
     
@@ -452,7 +579,7 @@ app.get('/api/telemetry/all-buckets', async (req, res) => {
  * GET /api/telemetry/daily-stats
  * Returns the aggregated statistics required for analytics
  */
-app.get('/api/telemetry/daily-stats', async (req, res) => {
+app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
   try {
     const { timeframe = 'today' } = req.query;
     let query = {};
@@ -464,22 +591,27 @@ app.get('/api/telemetry/daily-stats', async (req, res) => {
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
       query.last_updated = { $gte: startTime, $lt: endTime };
-      timeRangeText = `Today (${startTime.toLocaleDateString()})`;
+      timeRangeText = `Today (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else if (timeframe === 'yesterday') {
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
       query.last_updated = { $gte: startTime, $lt: endTime };
-      timeRangeText = `Yesterday (${startTime.toLocaleDateString()})`;
+      timeRangeText = `Yesterday (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else if (timeframe === 'this_week') {
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Sunday
       endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
       query.last_updated = { $gte: startTime, $lt: endTime };
-      timeRangeText = `This Week (${startTime.toLocaleDateString()} - ${now.toLocaleDateString()})`;
+      timeRangeText = `This Week (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
+    } else if (timeframe === 'last_15_mins') {
+      startTime = new Date(now.getTime() - 15 * 60 * 1000);
+      endTime = now;
+      query.last_updated = { $gte: startTime, $lte: endTime };
+      timeRangeText = `Last 15 Mins (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else if (timeframe === 'last_hour') {
       startTime = new Date(now.getTime() - 60 * 60 * 1000);
       endTime = now;
       query.last_updated = { $gte: startTime, $lte: endTime };
-      timeRangeText = `Last Hour (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
+      timeRangeText = `Last Hour (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else { // all_time
       timeRangeText = "All Time";
     }
@@ -598,7 +730,7 @@ app.get('/api/telemetry/daily-stats', async (req, res) => {
  * GET /api/telemetry/xray-stats
  * Returns Xray Proxy stats filtered by timeframe
  */
-app.get('/api/telemetry/xray-stats', async (req, res) => {
+app.get('/api/telemetry/xray-stats', verifyToken, async (req, res) => {
   try {
     const { timeframe = 'today' } = req.query;
     let query = {};
@@ -610,45 +742,80 @@ app.get('/api/telemetry/xray-stats', async (req, res) => {
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
       query.last_updated = { $gte: startTime, $lt: endTime };
-      timeRangeText = `Today (${startTime.toLocaleDateString()})`;
+      timeRangeText = `Today (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else if (timeframe === 'yesterday') {
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
       query.last_updated = { $gte: startTime, $lt: endTime };
-      timeRangeText = `Yesterday (${startTime.toLocaleDateString()})`;
+      timeRangeText = `Yesterday (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else if (timeframe === 'this_week') {
       startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Sunday
       endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
       query.last_updated = { $gte: startTime, $lt: endTime };
-      timeRangeText = `This Week (${startTime.toLocaleDateString()} - ${now.toLocaleDateString()})`;
+      timeRangeText = `This Week (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
+    } else if (timeframe === 'last_15_mins') {
+      startTime = new Date(now.getTime() - 15 * 60 * 1000);
+      endTime = now;
+      query.last_updated = { $gte: startTime, $lte: endTime };
+      timeRangeText = `Last 15 Mins (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else if (timeframe === 'last_hour') {
       startTime = new Date(now.getTime() - 60 * 60 * 1000);
       endTime = now;
       query.last_updated = { $gte: startTime, $lte: endTime };
-      timeRangeText = `Last Hour (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
+      timeRangeText = `Last Hour (${startTime.toLocaleString()} - ${endTime.toLocaleString()})`;
     } else { // all_time
       timeRangeText = "All Time";
     }
 
-    const statsRaw = await NetworkTelemetry.aggregate([
-      { $match: query },
-      { $group: {
-          _id: { 
-            proxy: { $ifNull: ["$active_proxy_ip", "$active_connection.ip"] }, 
-            user: "$user_id" 
-          },
-          total_sent: { $sum: "$delta_sent" },
-          total_received: { $sum: "$delta_received" },
-          user_data: { $first: "$telegram_user" }
-      }},
-      { $group: {
-          _id: "$_id.proxy",
-          total_sent: { $sum: "$total_sent" },
-          total_received: { $sum: "$total_received" },
-          user_ids: { $addToSet: "$_id.user" },
-          users_data: { $push: { id: "$_id.user", user: "$user_data" } }
-      }}
-    ]);
+    let pipeline = [];
+    if (req.query.latestPing === 'true') {
+      pipeline = [
+        { $match: query },
+        { $sort: { last_updated: -1 } },
+        { $group: {
+            _id: "$user_id",
+            doc: { $first: "$$ROOT" }
+        }},
+        { $replaceRoot: { newRoot: "$doc" } },
+        { $group: {
+            _id: { 
+              proxy: { $ifNull: ["$active_proxy_ip", "$active_connection.ip"] }, 
+              user: "$user_id" 
+            },
+            total_sent: { $sum: "$delta_sent" },
+            total_received: { $sum: "$delta_received" },
+            user_data: { $first: "$telegram_user" }
+        }},
+        { $group: {
+            _id: "$_id.proxy",
+            total_sent: { $sum: "$total_sent" },
+            total_received: { $sum: "$total_received" },
+            user_ids: { $addToSet: "$_id.user" },
+            users_data: { $push: { id: "$_id.user", user: "$user_data" } }
+        }}
+      ];
+    } else {
+      pipeline = [
+        { $match: query },
+        { $group: {
+            _id: { 
+              proxy: { $ifNull: ["$active_proxy_ip", "$active_connection.ip"] }, 
+              user: "$user_id" 
+            },
+            total_sent: { $sum: "$delta_sent" },
+            total_received: { $sum: "$delta_received" },
+            user_data: { $first: "$telegram_user" }
+        }},
+        { $group: {
+            _id: "$_id.proxy",
+            total_sent: { $sum: "$total_sent" },
+            total_received: { $sum: "$total_received" },
+            user_ids: { $addToSet: "$_id.user" },
+            users_data: { $push: { id: "$_id.user", user: "$user_data" } }
+        }}
+      ];
+    }
+    const statsRaw = await NetworkTelemetry.aggregate(pipeline);
 
     const results = statsRaw.map(st => {
       const uniqueUsersMap = {};
@@ -685,7 +852,7 @@ app.get('/api/telemetry/xray-stats', async (req, res) => {
 /**
  * DELETE /api/telemetry/logins
  */
-app.delete('/api/telemetry/logins', async (req, res) => {
+app.delete('/api/telemetry/logins', verifyToken, async (req, res) => {
   try {
     await LoginTelemetry.deleteMany({});
     res.json({ status: 'deleted' });
@@ -697,7 +864,7 @@ app.delete('/api/telemetry/logins', async (req, res) => {
 /**
  * DELETE /api/telemetry/network
  */
-app.delete('/api/telemetry/network', async (req, res) => {
+app.delete('/api/telemetry/network', verifyToken, async (req, res) => {
   try {
     await NetworkTelemetry.deleteMany({});
     await NetworkDailyBucket.deleteMany({});

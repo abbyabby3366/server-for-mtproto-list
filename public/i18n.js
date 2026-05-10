@@ -95,6 +95,8 @@ const translations = {
   "Usage Days": "使用天數",
   
   // Timeframes
+  "Latest Ping": "最新 Ping",
+  "Last 15 Mins": "過去 15 分鐘",
   "Last Hour": "過去一小時",
   "Today": "今天",
   "Yesterday": "昨天",
@@ -119,7 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const nav = document.querySelector('nav');
     if (nav) {
         const btn = document.createElement('button');
-        btn.style = 'margin-left: auto; padding: 4px 10px; background: #f39c12; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap;';
+        btn.id = 'langBtn';
+        btn.style = 'padding: 4px 10px; background: #f39c12; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap;';
         btn.innerText = lang === 'en' ? '中文' : 'English';
         btn.onclick = () => {
             localStorage.setItem('lang', lang === 'en' ? 'zh' : 'en');
