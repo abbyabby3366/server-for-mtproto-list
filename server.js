@@ -187,7 +187,7 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       jwtSecret,
-      { expiresIn: '24h' }
+      { expiresIn: '72h' }
     );
     res.json({ token, user: { username: user.username, role: user.role } });
   } catch (error) {
@@ -419,20 +419,10 @@ app.post('/proxies', apiKeyAuth, (req, res) => {
 
 /**
  * GET /
- * Root endpoint with basic info.
+ * Root endpoint redirects to configs page.
  */
 app.get('/', (req, res) => {
-  res.json({
-    service: 'MTProto Proxy Pool Server',
-    version: '1.0.0',
-    endpoints: {
-      'GET /proxies': 'Get list of available MTProto proxies',
-      'POST /proxies': 'Update proxy list (requires API_KEY)',
-      'GET /transit-ips': 'Get list of active Transit Node IPs',
-      'GET /api/android/version': 'Get Android app version metadata',
-      'GET /health': 'Health check'
-    }
-  });
+  res.redirect('/configs.html');
 });
 
 /**
