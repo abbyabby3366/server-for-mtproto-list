@@ -536,6 +536,227 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
 });
 
 /**
+ * GET /api/telemetry/network-pings
+ * Server-side paginated and searched endpoint for All Pings
+ */
+app.get('/api/telemetry/network-pings', verifyToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
+
+    let pipeline = [];
+
+    // We do NOT use limit(5000) here because we want true server pagination across all data
+    
+    // Lookup login data for phone, first_name, last_name, username
+    pipeline.push({
+      $lookup: {
+        from: 'logintelemetries',
+        let: { uid: '$user_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$telegram_user.user_id', '$$uid'] } } },
+          { $sort: { timestamp: -1 } },
+          { $limit: 1 }
+        ],
+        as: 'loginData'
+      }
+    });
+
+    pipeline.push({
+      $addFields: {
+        loginUser: { $arrayElemAt: ['$loginData.telegram_user', 0] }
+      }
+    });
+
+    pipeline.push({
+      $addFields: {
+        resolved_phone: { $ifNull: ['$telegram_user.phone_number', '$loginUser.phone_number'] },
+        resolved_first_name: { $ifNull: ['$telegram_user.first_name', '$loginUser.first_name'] },
+        resolved_last_name: { $ifNull: ['$telegram_user.last_name', '$loginUser.last_name'] },
+        resolved_username: { $ifNull: ['$telegram_user.username', '$loginUser.username'] },
+        str_user_id: { $toString: "$user_id" },
+        str_original_ip: { $toString: "$original_ip" },
+        str_active_proxy_ip: { $toString: "$active_proxy_ip" }
+      }
+    });
+
+    if (search) {
+      // Escape regex chars
+      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      pipeline.push({
+        $match: {
+          $or: [
+            { str_user_id: { $regex: safeSearch, $options: 'i' } },
+            { resolved_phone: { $regex: safeSearch, $options: 'i' } },
+            { resolved_first_name: { $regex: safeSearch, $options: 'i' } },
+            { resolved_last_name: { $regex: safeSearch, $options: 'i' } },
+            { resolved_username: { $regex: safeSearch, $options: 'i' } },
+            { str_original_ip: { $regex: safeSearch, $options: 'i' } },
+            { str_active_proxy_ip: { $regex: safeSearch, $options: 'i' } }
+          ]
+        }
+      });
+    }
+
+    const facet = {
+      metadata: [ { $count: "total" } ],
+      data: [
+        { $sort: { last_updated: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            loginData: 0,
+            loginUser: 0,
+            str_user_id: 0,
+            str_original_ip: 0,
+            str_active_proxy_ip: 0
+          }
+        }
+      ]
+    };
+
+    pipeline.push({ $facet: facet });
+
+    const results = await NetworkTelemetry.aggregate(pipeline);
+    const total = results[0].metadata[0] ? results[0].metadata[0].total : 0;
+    
+    const mappedData = results[0].data.map(net => {
+      let proxyIp = net.active_proxy_ip || net.active_connection?.ip || 'Unknown';
+      return {
+        ...net,
+        active_proxy_ip: proxyIp,
+        phone_number: net.resolved_phone || "",
+        first_name: net.resolved_first_name || "Unknown",
+        last_name: net.resolved_last_name || "",
+        username: net.resolved_username || ""
+      };
+    });
+
+    res.json({ total, data: mappedData });
+  } catch (error) {
+    console.error('Pings Pagination Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * GET /api/telemetry/network-users
+ * Server-side paginated and searched endpoint for Unique Users
+ */
+app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
+
+    let pipeline = [];
+
+    // 1. Group by user_id to get unique users, taking the latest record
+    pipeline.push({ $sort: { last_updated: -1 } });
+    pipeline.push({
+      $group: {
+        _id: "$user_id",
+        doc: { $first: "$$ROOT" }
+      }
+    });
+    pipeline.push({ $replaceRoot: { newRoot: "$doc" } });
+
+    // 2. Lookup login data
+    pipeline.push({
+      $lookup: {
+        from: 'logintelemetries',
+        let: { uid: '$user_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$telegram_user.user_id', '$$uid'] } } },
+          { $sort: { timestamp: -1 } },
+          { $limit: 1 }
+        ],
+        as: 'loginData'
+      }
+    });
+
+    pipeline.push({
+      $addFields: {
+        loginUser: { $arrayElemAt: ['$loginData.telegram_user', 0] }
+      }
+    });
+
+    pipeline.push({
+      $addFields: {
+        resolved_phone: { $ifNull: ['$telegram_user.phone_number', '$loginUser.phone_number'] },
+        resolved_first_name: { $ifNull: ['$telegram_user.first_name', '$loginUser.first_name'] },
+        resolved_last_name: { $ifNull: ['$telegram_user.last_name', '$loginUser.last_name'] },
+        resolved_username: { $ifNull: ['$telegram_user.username', '$loginUser.username'] },
+        str_user_id: { $toString: "$user_id" },
+        str_original_ip: { $toString: "$original_ip" },
+        str_active_proxy_ip: { $toString: "$active_proxy_ip" }
+      }
+    });
+
+    if (search) {
+      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      pipeline.push({
+        $match: {
+          $or: [
+            { str_user_id: { $regex: safeSearch, $options: 'i' } },
+            { resolved_phone: { $regex: safeSearch, $options: 'i' } },
+            { resolved_first_name: { $regex: safeSearch, $options: 'i' } },
+            { resolved_last_name: { $regex: safeSearch, $options: 'i' } },
+            { resolved_username: { $regex: safeSearch, $options: 'i' } },
+            { str_original_ip: { $regex: safeSearch, $options: 'i' } },
+            { str_active_proxy_ip: { $regex: safeSearch, $options: 'i' } }
+          ]
+        }
+      });
+    }
+
+    const facet = {
+      metadata: [ { $count: "total" } ],
+      data: [
+        { $sort: { last_updated: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            loginData: 0,
+            loginUser: 0,
+            str_user_id: 0,
+            str_original_ip: 0,
+            str_active_proxy_ip: 0
+          }
+        }
+      ]
+    };
+
+    pipeline.push({ $facet: facet });
+
+    const results = await NetworkTelemetry.aggregate(pipeline);
+    const total = results[0].metadata[0] ? results[0].metadata[0].total : 0;
+    
+    const mappedData = results[0].data.map(net => {
+      let proxyIp = net.active_proxy_ip || net.active_connection?.ip || 'Unknown';
+      return {
+        ...net,
+        active_proxy_ip: proxyIp,
+        phone_number: net.resolved_phone || "",
+        first_name: net.resolved_first_name || "Unknown",
+        last_name: net.resolved_last_name || "",
+        username: net.resolved_username || ""
+      };
+    });
+
+    res.json({ total, data: mappedData });
+  } catch (error) {
+    console.error('Users Pagination Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * GET /api/telemetry/all-buckets
  * Fetches all daily buckets sorted chronologically
  */

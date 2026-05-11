@@ -50,7 +50,7 @@
           <div class="spinner"></div>
           <span style="font-size: 13px; color: #666;" data-i18n>Loading...</span>
         </div>
-        <input type="text" id="search-input" placeholder="Search user, IP, phone..." oninput="filterData()" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+        <input type="text" id="search-input" placeholder="Search user, IP, phone..." oninput="onSearchInput()" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
         <button class="btn" style="background:#2ecc71; padding: 6px 12px; font-weight: bold;" title="View Statistics" onclick="showStatsModal()">
           <span data-i18n>View Stats</span>
         </button>
@@ -163,8 +163,14 @@
       localStorage.setItem('networkUsageActiveTab', tabId);
     }
 
-    function showModal(index) {
-      const data = allNetwork[index];
+    function showModalUser(index) {
+      const data = uniqueUsersArray[index];
+      document.getElementById('modal-content').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('details-modal').style.display = 'flex';
+    }
+
+    function showModalPing(index) {
+      const data = allBucketsArray[index];
       document.getElementById('modal-content').textContent = JSON.stringify(data, null, 2);
       document.getElementById('details-modal').style.display = 'flex';
     }
@@ -175,85 +181,93 @@
       document.getElementById('details-modal').style.display = 'none';
     }
 
-    function showStatsModal() {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const activeUsersToday = new Set();
-      let totalBytesSent = 0;
-      let totalBytesReceived = 0;
-      let wifiUsers = 0;
-      let mobileUsers = 0;
-      let topUser = { name: 'N/A', bytes: 0 };
-
-      allNetwork.forEach(row => {
-        // Active users today
-        const lastUpdated = new Date(row.last_updated);
-        if (lastUpdated >= today) {
-          activeUsersToday.add(row.user_id || row.phone_number || row.original_ip || Math.random());
-        }
-
-        // Totals
-        const sent = row.network_usage?.total_bytes_sent || 0;
-        const received = row.network_usage?.total_bytes_received || 0;
-        const totalUserBytes = sent + received;
-        totalBytesSent += sent;
-        totalBytesReceived += received;
-
-        // Top user
-        if (totalUserBytes > topUser.bytes) {
-          topUser = {
-            name: `${row.first_name || 'Unknown'} ${row.last_name || ''}`.trim() || row.phone_number || 'Unknown',
-            bytes: totalUserBytes
-          };
-        }
-
-        // Connection Preference (based on total bytes sent)
-        const wifiSent = row.network_usage?.wifi_bytes_sent || 0;
-        const mobileSent = row.network_usage?.mobile_bytes_sent || 0;
-        if (wifiSent > mobileSent) {
-          wifiUsers++;
-        } else if (mobileSent > wifiSent) {
-          mobileUsers++;
-        }
-      });
-
-      const totalUsers = allNetwork.length;
-
-      const html = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-          <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 24px; font-weight: bold; color: #2ecc71;">${activeUsersToday.size}</div>
-            <div style="font-size: 12px; color: #666; text-transform: uppercase;">Active Today</div>
-          </div>
-          <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 24px; font-weight: bold; color: #3498db;">${totalUsers}</div>
-            <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Users</div>
-          </div>
-        </div>
-
-        <ul style="list-style: none; padding: 0; margin-top: 20px;">
-          <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-            <strong>Total Data Sent (All-Time):</strong> 
-            <span class="bytes">${formatBytes(totalBytesSent)}</span>
-          </li>
-          <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-            <strong>Total Data Received (All-Time):</strong> 
-            <span class="bytes">${formatBytes(totalBytesReceived)}</span>
-          </li>
-          <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
-            <strong>Top User (Data Volume):</strong> 
-            <span>${topUser.name} <span class="sub-text">(${formatBytes(topUser.bytes)})</span></span>
-          </li>
-          <li style="padding: 10px 0; display: flex; justify-content: space-between;">
-            <strong>Preferred Network Type:</strong> 
-            <span>${wifiUsers >= mobileUsers ? 'WiFi 📶' : 'Mobile Data 📱'}</span>
-          </li>
-        </ul>
-      `;
-
-      document.getElementById('stats-content').innerHTML = html;
+    async function showStatsModal() {
       document.getElementById('stats-modal').style.display = 'flex';
+      document.getElementById('stats-content').innerHTML = '<div style="text-align:center; padding:20px;">Loading stats...</div>';
+      
+      try {
+        const res = await fetch('/api/telemetry/stats?t=' + new Date().getTime());
+        const data = await res.json();
+        const networkRaw = data.network || [];
+        const allNetwork = networkRaw.sort((a,b) => new Date(b.last_updated) - new Date(a.last_updated));
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const activeUsersToday = new Set();
+        let totalBytesSent = 0;
+        let totalBytesReceived = 0;
+        let wifiUsers = 0;
+        let mobileUsers = 0;
+        let topUser = { name: 'N/A', bytes: 0 };
+
+        allNetwork.forEach(row => {
+          const lastUpdated = new Date(row.last_updated);
+          if (lastUpdated >= today) {
+            activeUsersToday.add(row.user_id || row.phone_number || row.original_ip || Math.random());
+          }
+
+          const sent = row.network_usage?.total_bytes_sent || 0;
+          const received = row.network_usage?.total_bytes_received || 0;
+          const totalUserBytes = sent + received;
+          totalBytesSent += sent;
+          totalBytesReceived += received;
+
+          if (totalUserBytes > topUser.bytes) {
+            topUser = {
+              name: `${row.first_name || 'Unknown'} ${row.last_name || ''}`.trim() || row.phone_number || 'Unknown',
+              bytes: totalUserBytes
+            };
+          }
+
+          const wifiSent = row.network_usage?.wifi_bytes_sent || 0;
+          const mobileSent = row.network_usage?.mobile_bytes_sent || 0;
+          if (wifiSent > mobileSent) {
+            wifiUsers++;
+          } else if (mobileSent > wifiSent) {
+            mobileUsers++;
+          }
+        });
+
+        const totalUsers = allNetwork.length;
+
+        const html = `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #2ecc71;">${activeUsersToday.size}</div>
+              <div style="font-size: 12px; color: #666; text-transform: uppercase;">Active Today</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #3498db;">${totalUsers}</div>
+              <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Users</div>
+            </div>
+          </div>
+
+          <ul style="list-style: none; padding: 0; margin-top: 20px;">
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+              <strong>Total Data Sent (All-Time):</strong> 
+              <span class="bytes">${formatBytes(totalBytesSent)}</span>
+            </li>
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+              <strong>Total Data Received (All-Time):</strong> 
+              <span class="bytes">${formatBytes(totalBytesReceived)}</span>
+            </li>
+            <li style="padding: 10px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between;">
+              <strong>Top User (Data Volume):</strong> 
+              <span>${topUser.name} <span class="sub-text">(${formatBytes(topUser.bytes)})</span></span>
+            </li>
+            <li style="padding: 10px 0; display: flex; justify-content: space-between;">
+              <strong>Preferred Network Type:</strong> 
+              <span>${wifiUsers >= mobileUsers ? 'WiFi 📶' : 'Mobile Data 📱'}</span>
+            </li>
+          </ul>
+        `;
+
+        document.getElementById('stats-content').innerHTML = html;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('stats-content').innerHTML = '<div style="color:red; text-align:center;">Error loading stats.</div>';
+      }
     }
 
     function closeStatsModal() {
@@ -282,72 +296,46 @@
 
     let uniqueUsersArray = [];
     let allBucketsArray = [];
-    let filteredUniqueUsersArray = [];
-    let filteredAllBucketsArray = [];
     let currentPageUser = 1;
     const itemsPerPageUser = 50;
     let currentPageTime = 1;
     const itemsPerPageTime = 50;
+    let currentSearchTerm = '';
+    let totalUsers = 0;
+    let totalPings = 0;
+    let searchTimeout;
 
-    function filterData(isAutoRefresh = false) {
-      const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
-      
-      if (!searchTerm) {
-        filteredUniqueUsersArray = [...uniqueUsersArray];
-        filteredAllBucketsArray = [...allBucketsArray];
-      } else {
-        const matchRow = (row) => {
-          const tUser = row.telegram_user || {};
-          const fields = [
-            String(row.user_id || ''),
-            String(row.phone_number || tUser.phone_number || ''),
-            String(row.first_name || tUser.first_name || ''),
-            String(row.last_name || tUser.last_name || ''),
-            String(row.username || tUser.username || ''),
-            String(row.original_ip || ''),
-            String(row.active_proxy_ip || '')
-          ];
-          return fields.some(field => field.toLowerCase().includes(searchTerm));
-        };
+    const prefetchCache = {
+      users: { page: null, search: null, promise: null },
+      pings: { page: null, search: null, promise: null }
+    };
 
-        filteredUniqueUsersArray = uniqueUsersArray.filter(item => matchRow(item.row));
-        filteredAllBucketsArray = allBucketsArray.filter(row => matchRow(row));
-      }
-      
-      document.getElementById('user-count').textContent = `(${filteredUniqueUsersArray.length})`;
-      document.getElementById('ping-count').textContent = `(${filteredAllBucketsArray.length})`;
-
-      if (!isAutoRefresh) {
+    function onSearchInput() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        currentSearchTerm = document.getElementById('search-input').value.toLowerCase().trim();
         currentPageUser = 1;
         currentPageTime = 1;
-      }
-      
-      renderUserTable();
-      renderTimeTable();
+        loadData(false);
+      }, 300);
     }
 
     function renderUserTable() {
       const netBody = document.getElementById('network-body');
       netBody.innerHTML = '';
-      if (filteredUniqueUsersArray.length === 0) {
-        netBody.innerHTML = '<tr><td colspan="9">No network data found.</td></tr>';
+      if (uniqueUsersArray.length === 0) {
+        netBody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">No network data found.</td></tr>';
         document.getElementById('pagination-user').style.display = 'none';
         return;
       }
       
       document.getElementById('pagination-user').style.display = 'flex';
-      const totalPages = Math.ceil(filteredUniqueUsersArray.length / itemsPerPageUser);
-      if (currentPageUser > totalPages) currentPageUser = totalPages;
-      if (currentPageUser < 1) currentPageUser = 1;
+      const totalPages = Math.ceil(totalUsers / itemsPerPageUser);
 
-      document.getElementById('page-info-user').textContent = `Page ${currentPageUser} of ${totalPages}`;
-      document.getElementById('total-info-user').textContent = `Total Users: ${filteredUniqueUsersArray.length}`;
+      document.getElementById('page-info-user').textContent = `Page ${currentPageUser} of ${totalPages || 1}`;
+      document.getElementById('total-info-user').textContent = `Total Users: ${totalUsers}`;
 
-      const startIndex = (currentPageUser - 1) * itemsPerPageUser;
-      const endIndex = startIndex + itemsPerPageUser;
-      const paginatedData = filteredUniqueUsersArray.slice(startIndex, endIndex);
-
-      paginatedData.forEach(({ row, index }) => {
+      uniqueUsersArray.forEach((row, index) => {
         const tr = document.createElement('tr');
         tr.id = 'user-row-' + row.user_id;
         tr.innerHTML = `
@@ -368,7 +356,7 @@
             S: ${formatBytes(row.network_usage?.wifi_bytes_sent)}<br>
             <span class="sub-text">R: ${formatBytes(row.network_usage?.wifi_bytes_received)}</span>
           </td>
-          <td><button class="btn" onclick="showModal(${index})">${window.t ? window.t("View Details") : "View Details"}</button></td>
+          <td><button class="btn" onclick="showModalUser(${index})">${window.t ? window.t("View Details") : "View Details"}</button></td>
         `;
         netBody.appendChild(tr);
       });
@@ -379,26 +367,19 @@
     function renderTimeTable() {
       const timeBody = document.getElementById('time-body');
       timeBody.innerHTML = '';
-      if (filteredAllBucketsArray.length === 0) {
-        timeBody.innerHTML = '<tr><td colspan="7">No historical data found.</td></tr>';
+      if (allBucketsArray.length === 0) {
+        timeBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No historical data found.</td></tr>';
         document.getElementById('pagination-time').style.display = 'none';
         return;
       }
       
       document.getElementById('pagination-time').style.display = 'flex';
-      const totalPages = Math.ceil(filteredAllBucketsArray.length / itemsPerPageTime);
-      if (currentPageTime > totalPages) currentPageTime = totalPages;
-      if (currentPageTime < 1) currentPageTime = 1;
+      const totalPages = Math.ceil(totalPings / itemsPerPageTime);
 
-      document.getElementById('page-info-time').textContent = `Page ${currentPageTime} of ${totalPages}`;
-      document.getElementById('total-info-time').textContent = `Total Pings: ${filteredAllBucketsArray.length}`;
+      document.getElementById('page-info-time').textContent = `Page ${currentPageTime} of ${totalPages || 1}`;
+      document.getElementById('total-info-time').textContent = `Total Pings: ${totalPings}`;
 
-      const startIndex = (currentPageTime - 1) * itemsPerPageTime;
-      const endIndex = startIndex + itemsPerPageTime;
-      const paginatedData = filteredAllBucketsArray.slice(startIndex, endIndex);
-
-      paginatedData.forEach((row, i) => {
-        const actualIndex = startIndex + i;
+      allBucketsArray.forEach((row, index) => {
         const tr = document.createElement('tr');
         
         let displayName = 'Unknown';
@@ -424,7 +405,7 @@
           </td>
           <td class="bytes" style="color: #2980b9;">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
           <td class="bytes" style="color: #2ecc71;">${formatBytes(row.network_usage?.total_bytes_received)}</td>
-          <td><button class="btn" onclick="showModal(${actualIndex})">${window.t ? window.t("View Details") : "View Details"}</button></td>
+          <td><button class="btn" onclick="showModalPing(${index})">${window.t ? window.t("View Details") : "View Details"}</button></td>
         `;
         timeBody.appendChild(tr);
       });
@@ -432,31 +413,73 @@
       if (window.updateTranslations) window.updateTranslations();
     }
 
-    function prevPageUser() { if (currentPageUser > 1) { currentPageUser--; renderUserTable(); } }
-    function nextPageUser() { if (currentPageUser < Math.ceil(filteredUniqueUsersArray.length / itemsPerPageUser)) { currentPageUser++; renderUserTable(); } }
-    function prevPageTime() { if (currentPageTime > 1) { currentPageTime--; renderTimeTable(); } }
-    function nextPageTime() { if (currentPageTime < Math.ceil(filteredAllBucketsArray.length / itemsPerPageTime)) { currentPageTime++; renderTimeTable(); } }
+    function prevPageUser() { if (currentPageUser > 1) { currentPageUser--; loadData(false); } }
+    function nextPageUser() { if (currentPageUser < Math.ceil(totalUsers / itemsPerPageUser)) { currentPageUser++; loadData(false); } }
+    function prevPageTime() { if (currentPageTime > 1) { currentPageTime--; loadData(false); } }
+    function nextPageTime() { if (currentPageTime < Math.ceil(totalPings / itemsPerPageTime)) { currentPageTime++; loadData(false); } }
 
-    async function loadData() {
+    async function fetchUsersApi(page, search) {
+      if (prefetchCache.users.page === page && prefetchCache.users.search === search && prefetchCache.users.promise) {
+        return prefetchCache.users.promise;
+      }
+      return fetch(`/api/telemetry/network-users?page=${page}&limit=${itemsPerPageUser}&search=${encodeURIComponent(search)}`).then(r => r.json());
+    }
+
+    async function fetchPingsApi(page, search) {
+      if (prefetchCache.pings.page === page && prefetchCache.pings.search === search && prefetchCache.pings.promise) {
+        return prefetchCache.pings.promise;
+      }
+      return fetch(`/api/telemetry/network-pings?page=${page}&limit=${itemsPerPageTime}&search=${encodeURIComponent(search)}`).then(r => r.json());
+    }
+
+    function triggerPrefetch(search) {
+      const nextUserPage = currentPageUser + 1;
+      if (nextUserPage <= Math.ceil(totalUsers / itemsPerPageUser)) {
+        prefetchCache.users = {
+          page: nextUserPage,
+          search: search,
+          promise: fetch(`/api/telemetry/network-users?page=${nextUserPage}&limit=${itemsPerPageUser}&search=${encodeURIComponent(search)}`).then(r => r.json())
+        };
+      }
+
+      const nextPingPage = currentPageTime + 1;
+      if (nextPingPage <= Math.ceil(totalPings / itemsPerPageTime)) {
+        prefetchCache.pings = {
+          page: nextPingPage,
+          search: search,
+          promise: fetch(`/api/telemetry/network-pings?page=${nextPingPage}&limit=${itemsPerPageTime}&search=${encodeURIComponent(search)}`).then(r => r.json())
+        };
+      }
+    }
+
+    async function loadData(isAutoRefresh = false) {
       const loader = document.getElementById('loading-indicator');
       if (loader) loader.style.display = 'flex';
-      try {
-        const res = await fetch('/api/telemetry/stats?t=' + new Date().getTime());
-        const data = await res.json();
-        
-        const networkRaw = data.network || [];
-        allNetwork = networkRaw.sort((a,b) => new Date(b.last_updated) - new Date(a.last_updated));
-        
-        const uniqueUsersMap = new Map();
-        allNetwork.forEach((row, index) => {
-          if (!uniqueUsersMap.has(row.user_id)) {
-            uniqueUsersMap.set(row.user_id, { row, index });
-          }
-        });
-        uniqueUsersArray = Array.from(uniqueUsersMap.values());
-        allBucketsArray = allNetwork;
+      
+      if (!isAutoRefresh) {
+        document.getElementById('network-body').innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
+        document.getElementById('time-body').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
+      }
 
-        filterData(true);
+      try {
+        const [usersData, pingsData] = await Promise.all([
+          fetchUsersApi(currentPageUser, currentSearchTerm),
+          fetchPingsApi(currentPageTime, currentSearchTerm)
+        ]);
+
+        uniqueUsersArray = usersData.data || [];
+        totalUsers = usersData.total || 0;
+        
+        allBucketsArray = pingsData.data || [];
+        totalPings = pingsData.total || 0;
+
+        document.getElementById('user-count').textContent = `(${totalUsers})`;
+        document.getElementById('ping-count').textContent = `(${totalPings})`;
+
+        renderUserTable();
+        renderTimeTable();
+        
+        triggerPrefetch(currentSearchTerm);
 
         const urlParams = new URLSearchParams(window.location.search);
         const highlightUser = urlParams.get('highlightUser');
@@ -477,7 +500,6 @@
       } catch (err) {
         console.error(err);
       } finally {
-        const loader = document.getElementById('loading-indicator');
         if (loader) loader.style.display = 'none';
       }
     }
@@ -498,8 +520,8 @@
       }
     }
 
-    loadData();
-    setInterval(loadData, 10000);
+    loadData(false);
+    setInterval(() => loadData(true), 10000);
   </script>
 </body>
 </html>
