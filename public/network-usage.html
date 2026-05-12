@@ -50,17 +50,27 @@
           <div class="spinner"></div>
           <span style="font-size: 13px; color: #666;" data-i18n>Loading...</span>
         </div>
-        <input type="text" id="search-input" placeholder="Search user, IP, phone..." oninput="onSearchInput()" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; width: 250px;">
+        <input type="text" id="search-input" placeholder="Search user, IP, phone, APK version..." oninput="onSearchInput()" style="padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; width: 280px;">
         <button class="btn" style="background:#2ecc71; padding: 6px 12px; font-weight: bold;" title="View Statistics" onclick="showStatsModal()">
           <span data-i18n>View Stats</span>
         </button>
       </div>
-      <button class="btn" style="background:#e74c3c; padding: 6px 10px;" title="Delete All Network Data" onclick="deleteAllNetwork()">
-        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path>
-        </svg>
-      </button>
+      <div style="position: relative; display: inline-block;">
+        <button class="btn" style="background:#e74c3c; padding: 6px 10px;" title="Delete Network Data" onclick="toggleDeleteMenu()">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path>
+          </svg>
+        </button>
+        <div id="delete-menu" style="display:none; position:absolute; right:0; top:100%; margin-top:4px; background:white; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:100; min-width:220px; overflow:hidden;">
+          <div style="padding:8px 12px; font-weight:600; font-size:12px; color:#666; border-bottom:1px solid #eee;">Delete pings older than...</div>
+          <div onclick="deleteNetwork('yesterday')" style="padding:8px 12px; cursor:pointer; font-size:13px;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">🕐 Older than yesterday</div>
+          <div onclick="deleteNetwork('week')" style="padding:8px 12px; cursor:pointer; font-size:13px;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">📅 Older than last week</div>
+          <div onclick="deleteNetwork('month')" style="padding:8px 12px; cursor:pointer; font-size:13px;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">🗓️ Older than last month</div>
+          <div style="border-top:1px solid #eee;"></div>
+          <div onclick="deleteNetwork('all')" style="padding:8px 12px; cursor:pointer; font-size:13px; color:#e74c3c; font-weight:600;" onmouseover="this.style.background='#fdf0ef'" onmouseout="this.style.background='white'">🗑️ Delete ALL records</div>
+        </div>
+      </div>
     </div>
 
     <div class="tabs">
@@ -73,6 +83,14 @@
     </div>
 
     <div id="tab-user" class="tab-content active">
+      <div id="pagination-user-top" style="display: none; justify-content: flex-end; align-items: center; gap: 15px; padding: 6px 10px; background: white; border-bottom: 1px solid #ddd;">
+        <div id="total-info-user-top" style="color: #666; font-size: 13px;"></div>
+        <div>
+          <button class="btn" onclick="prevPageUser()">Previous</button>
+          <span id="page-info-user-top" style="margin: 0 15px; font-weight: bold;">Page 1</span>
+          <button class="btn" onclick="nextPageUser()">Next</button>
+        </div>
+      </div>
       <div style="overflow-x: auto; width: 100%;">
         <table style="min-width: 600px;">
           <thead>
@@ -93,17 +111,25 @@
           </tbody>
         </table>
       </div>
-      <div id="pagination-user" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-top: 1px solid #ddd; display: none;">
+      <div id="pagination-user" style="display: none; justify-content: flex-end; align-items: center; gap: 15px; padding: 10px; background: white; border-top: 1px solid #ddd;">
+        <div id="total-info-user" style="color: #666; font-size: 13px;"></div>
         <div>
           <button class="btn" onclick="prevPageUser()">Previous</button>
           <span id="page-info-user" style="margin: 0 15px; font-weight: bold;">Page 1</span>
           <button class="btn" onclick="nextPageUser()">Next</button>
         </div>
-        <div id="total-info-user" style="color: #666; font-size: 13px;"></div>
       </div>
     </div>
 
     <div id="tab-time" class="tab-content">
+      <div id="pagination-time-top" style="display: none; justify-content: flex-end; align-items: center; gap: 15px; padding: 6px 10px; background: white; border-bottom: 1px solid #ddd;">
+        <div id="total-info-time-top" style="color: #666; font-size: 13px;"></div>
+        <div>
+          <button class="btn" onclick="prevPageTime()">Previous</button>
+          <span id="page-info-time-top" style="margin: 0 15px; font-weight: bold;">Page 1</span>
+          <button class="btn" onclick="nextPageTime()">Next</button>
+        </div>
+      </div>
       <div style="overflow-x: auto; width: 100%;">
         <table style="min-width: 600px;">
           <thead>
@@ -118,17 +144,17 @@
             </tr>
           </thead>
           <tbody id="time-body">
-            <tr><td colspan="7">Loading...</td></tr>
+            <tr><td colspan="7">Click this tab to load data.</td></tr>
           </tbody>
         </table>
       </div>
-      <div id="pagination-time" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-top: 1px solid #ddd; display: none;">
+      <div id="pagination-time" style="display: none; justify-content: flex-end; align-items: center; gap: 15px; padding: 10px; background: white; border-top: 1px solid #ddd;">
+        <div id="total-info-time" style="color: #666; font-size: 13px;"></div>
         <div>
           <button class="btn" onclick="prevPageTime()">Previous</button>
           <span id="page-info-time" style="margin: 0 15px; font-weight: bold;">Page 1</span>
           <button class="btn" onclick="nextPageTime()">Next</button>
         </div>
-        <div id="total-info-time" style="color: #666; font-size: 13px;"></div>
       </div>
     </div>
   </div>
@@ -152,30 +178,60 @@
   </div>
 
   <script>
-    let allNetwork = [];
-    let allBuckets = [];
+    let uniqueUsersArray = [];
+    let allBucketsArray = [];
+    let currentPageUser = 1;
+    const itemsPerPageUser = 50;
+    let currentPageTime = 1;
+    const itemsPerPageTime = 50;
+    let currentSearchTerm = '';
+    let totalUsers = 0;
+    let totalPings = 0;
+    let searchTimeout;
+    let activeTab = 'tab-user';
+    // Track whether each tab has been loaded at least once
+    let tabLoaded = { 'tab-user': false, 'tab-time': false };
+
+    function getActiveTab() { return activeTab; }
 
     function switchTab(tabId, element) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       element.classList.add('active');
       document.getElementById(tabId).classList.add('active');
+      activeTab = tabId;
       localStorage.setItem('networkUsageActiveTab', tabId);
+      // Load data for this tab if not loaded yet
+      if (!tabLoaded[tabId]) {
+        loadActiveTab(false);
+      }
+    }
+
+    function cleanForModal(data) {
+      const clean = { ...data };
+      // Remove enriched duplicate fields (already in telegram_user)
+      delete clean.phone_number;
+      delete clean.first_name;
+      delete clean.last_name;
+      delete clean.username;
+      delete clean.resolved_phone;
+      delete clean.resolved_first_name;
+      delete clean.resolved_last_name;
+      delete clean.resolved_username;
+      return clean;
     }
 
     function showModalUser(index) {
-      const data = uniqueUsersArray[index];
+      const data = cleanForModal(uniqueUsersArray[index]);
       document.getElementById('modal-content').textContent = JSON.stringify(data, null, 2);
       document.getElementById('details-modal').style.display = 'flex';
     }
 
     function showModalPing(index) {
-      const data = allBucketsArray[index];
+      const data = cleanForModal(allBucketsArray[index]);
       document.getElementById('modal-content').textContent = JSON.stringify(data, null, 2);
       document.getElementById('details-modal').style.display = 'flex';
     }
-
-    // Removed showBucketModal
 
     function closeModal() {
       document.getElementById('details-modal').style.display = 'none';
@@ -229,7 +285,7 @@
           }
         });
 
-        const totalUsers = allNetwork.length;
+        const totalUsersCount = allNetwork.length;
 
         const html = `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
@@ -238,7 +294,7 @@
               <div style="font-size: 12px; color: #666; text-transform: uppercase;">Active Today</div>
             </div>
             <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: #3498db;">${totalUsers}</div>
+              <div style="font-size: 24px; font-weight: bold; color: #3498db;">${totalUsersCount}</div>
               <div style="font-size: 12px; color: #666; text-transform: uppercase;">Total Users</div>
             </div>
           </div>
@@ -274,15 +330,29 @@
       document.getElementById('stats-modal').style.display = 'none';
     }
 
-    async function deleteAllNetwork() {
-      if (confirm("Are you sure you want to delete ALL network records? This cannot be undone.")) {
-        try {
-          await fetch('/api/telemetry/network', { method: 'DELETE' });
-          loadData();
-        } catch (e) {
-          console.error(e);
-          alert('Error deleting records.');
-        }
+    function toggleDeleteMenu() {
+      const menu = document.getElementById('delete-menu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('delete-menu');
+      if (menu && !e.target.closest('#delete-menu') && !e.target.closest('[onclick*="toggleDeleteMenu"]')) {
+        menu.style.display = 'none';
+      }
+    });
+
+    async function deleteNetwork(range) {
+      document.getElementById('delete-menu').style.display = 'none';
+      const labels = { yesterday: 'yesterday', week: 'last week', month: 'last month', all: 'ALL time' };
+      if (!confirm(`Delete all pings older than ${labels[range] || range}? This cannot be undone.`)) return;
+      try {
+        await fetch(`/api/telemetry/network?range=${range}`, { method: 'DELETE' });
+        tabLoaded = { 'tab-user': false, 'tab-time': false };
+        loadActiveTab(false);
+      } catch (e) {
+        console.error(e);
+        alert('Error deleting records.');
       }
     }
 
@@ -294,29 +364,14 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    let uniqueUsersArray = [];
-    let allBucketsArray = [];
-    let currentPageUser = 1;
-    const itemsPerPageUser = 50;
-    let currentPageTime = 1;
-    const itemsPerPageTime = 50;
-    let currentSearchTerm = '';
-    let totalUsers = 0;
-    let totalPings = 0;
-    let searchTimeout;
-
-    const prefetchCache = {
-      users: { page: null, search: null, promise: null },
-      pings: { page: null, search: null, promise: null }
-    };
-
     function onSearchInput() {
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         currentSearchTerm = document.getElementById('search-input').value.toLowerCase().trim();
         currentPageUser = 1;
         currentPageTime = 1;
-        loadData(false);
+        tabLoaded = { 'tab-user': false, 'tab-time': false };
+        loadActiveTab(false);
       }, 300);
     }
 
@@ -326,14 +381,22 @@
       if (uniqueUsersArray.length === 0) {
         netBody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">No network data found.</td></tr>';
         document.getElementById('pagination-user').style.display = 'none';
+        document.getElementById('pagination-user-top').style.display = 'none';
         return;
       }
       
       document.getElementById('pagination-user').style.display = 'flex';
+      document.getElementById('pagination-user-top').style.display = 'flex';
       const totalPages = Math.ceil(totalUsers / itemsPerPageUser);
+      const startItem = (currentPageUser - 1) * itemsPerPageUser + 1;
+      const endItem = Math.min(currentPageUser * itemsPerPageUser, totalUsers);
+      const pageText = `Page ${currentPageUser} of ${totalPages || 1}`;
+      const totalText = `Showing ${startItem}-${endItem} of ${totalUsers} users`;
 
-      document.getElementById('page-info-user').textContent = `Page ${currentPageUser} of ${totalPages || 1}`;
-      document.getElementById('total-info-user').textContent = `Total Users: ${totalUsers}`;
+      document.getElementById('page-info-user').textContent = pageText;
+      document.getElementById('page-info-user-top').textContent = pageText;
+      document.getElementById('total-info-user').textContent = totalText;
+      document.getElementById('total-info-user-top').textContent = totalText;
 
       uniqueUsersArray.forEach((row, index) => {
         const tr = document.createElement('tr');
@@ -370,14 +433,22 @@
       if (allBucketsArray.length === 0) {
         timeBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No historical data found.</td></tr>';
         document.getElementById('pagination-time').style.display = 'none';
+        document.getElementById('pagination-time-top').style.display = 'none';
         return;
       }
       
       document.getElementById('pagination-time').style.display = 'flex';
+      document.getElementById('pagination-time-top').style.display = 'flex';
       const totalPages = Math.ceil(totalPings / itemsPerPageTime);
+      const startItem = (currentPageTime - 1) * itemsPerPageTime + 1;
+      const endItem = Math.min(currentPageTime * itemsPerPageTime, totalPings);
+      const pageText = `Page ${currentPageTime} of ${totalPages || 1}`;
+      const totalText = `Showing ${startItem}-${endItem} of ${totalPings} pings`;
 
-      document.getElementById('page-info-time').textContent = `Page ${currentPageTime} of ${totalPages || 1}`;
-      document.getElementById('total-info-time').textContent = `Total Pings: ${totalPings}`;
+      document.getElementById('page-info-time').textContent = pageText;
+      document.getElementById('page-info-time-top').textContent = pageText;
+      document.getElementById('total-info-time').textContent = totalText;
+      document.getElementById('total-info-time-top').textContent = totalText;
 
       allBucketsArray.forEach((row, index) => {
         const tr = document.createElement('tr');
@@ -413,89 +484,56 @@
       if (window.updateTranslations) window.updateTranslations();
     }
 
-    function prevPageUser() { if (currentPageUser > 1) { currentPageUser--; loadData(false); } }
-    function nextPageUser() { if (currentPageUser < Math.ceil(totalUsers / itemsPerPageUser)) { currentPageUser++; loadData(false); } }
-    function prevPageTime() { if (currentPageTime > 1) { currentPageTime--; loadData(false); } }
-    function nextPageTime() { if (currentPageTime < Math.ceil(totalPings / itemsPerPageTime)) { currentPageTime++; loadData(false); } }
+    function prevPageUser() { if (currentPageUser > 1) { currentPageUser--; loadActiveTab(false); } }
+    function nextPageUser() { if (currentPageUser < Math.ceil(totalUsers / itemsPerPageUser)) { currentPageUser++; loadActiveTab(false); } }
+    function prevPageTime() { if (currentPageTime > 1) { currentPageTime--; loadActiveTab(false); } }
+    function nextPageTime() { if (currentPageTime < Math.ceil(totalPings / itemsPerPageTime)) { currentPageTime++; loadActiveTab(false); } }
 
-    async function fetchUsersApi(page, search) {
-      if (prefetchCache.users.page === page && prefetchCache.users.search === search && prefetchCache.users.promise) {
-        return prefetchCache.users.promise;
-      }
-      return fetch(`/api/telemetry/network-users?page=${page}&limit=${itemsPerPageUser}&search=${encodeURIComponent(search)}`).then(r => r.json());
-    }
-
-    async function fetchPingsApi(page, search) {
-      if (prefetchCache.pings.page === page && prefetchCache.pings.search === search && prefetchCache.pings.promise) {
-        return prefetchCache.pings.promise;
-      }
-      return fetch(`/api/telemetry/network-pings?page=${page}&limit=${itemsPerPageTime}&search=${encodeURIComponent(search)}`).then(r => r.json());
-    }
-
-    function triggerPrefetch(search) {
-      const nextUserPage = currentPageUser + 1;
-      if (nextUserPage <= Math.ceil(totalUsers / itemsPerPageUser)) {
-        prefetchCache.users = {
-          page: nextUserPage,
-          search: search,
-          promise: fetch(`/api/telemetry/network-users?page=${nextUserPage}&limit=${itemsPerPageUser}&search=${encodeURIComponent(search)}`).then(r => r.json())
-        };
-      }
-
-      const nextPingPage = currentPageTime + 1;
-      if (nextPingPage <= Math.ceil(totalPings / itemsPerPageTime)) {
-        prefetchCache.pings = {
-          page: nextPingPage,
-          search: search,
-          promise: fetch(`/api/telemetry/network-pings?page=${nextPingPage}&limit=${itemsPerPageTime}&search=${encodeURIComponent(search)}`).then(r => r.json())
-        };
-      }
-    }
-
-    async function loadData(isAutoRefresh = false) {
+    async function loadActiveTab(isAutoRefresh = false) {
       const loader = document.getElementById('loading-indicator');
       if (loader) loader.style.display = 'flex';
-      
-      if (!isAutoRefresh) {
-        document.getElementById('network-body').innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
-        document.getElementById('time-body').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
-      }
 
       try {
-        const [usersData, pingsData] = await Promise.all([
-          fetchUsersApi(currentPageUser, currentSearchTerm),
-          fetchPingsApi(currentPageTime, currentSearchTerm)
-        ]);
+        if (activeTab === 'tab-user') {
+          if (!isAutoRefresh) {
+            document.getElementById('network-body').innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
+          }
+          const res = await fetch(`/api/telemetry/network-users?page=${currentPageUser}&limit=${itemsPerPageUser}&search=${encodeURIComponent(currentSearchTerm)}`);
+          const usersData = await res.json();
+          uniqueUsersArray = usersData.data || [];
+          totalUsers = usersData.total || 0;
+          document.getElementById('user-count').textContent = `(${totalUsers})`;
+          renderUserTable();
+          tabLoaded['tab-user'] = true;
 
-        uniqueUsersArray = usersData.data || [];
-        totalUsers = usersData.total || 0;
-        
-        allBucketsArray = pingsData.data || [];
-        totalPings = pingsData.total || 0;
-
-        document.getElementById('user-count').textContent = `(${totalUsers})`;
-        document.getElementById('ping-count').textContent = `(${totalPings})`;
-
-        renderUserTable();
-        renderTimeTable();
-        
-        triggerPrefetch(currentSearchTerm);
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const highlightUser = urlParams.get('highlightUser');
-        if (highlightUser && !window.hasHighlighted) {
-           const rowToHighlight = document.getElementById('user-row-' + highlightUser);
-           if (rowToHighlight) {
-               setTimeout(() => {
-                   rowToHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                   rowToHighlight.style.backgroundColor = '#ffff99';
-                   setTimeout(() => {
-                       rowToHighlight.style.transition = 'background-color 2s';
-                       rowToHighlight.style.backgroundColor = '';
-                   }, 2000);
-               }, 100);
-               window.hasHighlighted = true;
-           }
+          // Handle highlight from URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const highlightUser = urlParams.get('highlightUser');
+          if (highlightUser && !window.hasHighlighted) {
+            const rowToHighlight = document.getElementById('user-row-' + highlightUser);
+            if (rowToHighlight) {
+              setTimeout(() => {
+                rowToHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                rowToHighlight.style.backgroundColor = '#ffff99';
+                setTimeout(() => {
+                  rowToHighlight.style.transition = 'background-color 2s';
+                  rowToHighlight.style.backgroundColor = '';
+                }, 2000);
+              }, 100);
+              window.hasHighlighted = true;
+            }
+          }
+        } else if (activeTab === 'tab-time') {
+          if (!isAutoRefresh) {
+            document.getElementById('time-body').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
+          }
+          const res = await fetch(`/api/telemetry/network-pings?page=${currentPageTime}&limit=${itemsPerPageTime}&search=${encodeURIComponent(currentSearchTerm)}`);
+          const pingsData = await res.json();
+          allBucketsArray = pingsData.data || [];
+          totalPings = pingsData.total || 0;
+          document.getElementById('ping-count').textContent = `(${totalPings})`;
+          renderTimeTable();
+          tabLoaded['tab-time'] = true;
         }
       } catch (err) {
         console.error(err);
@@ -520,8 +558,8 @@
       }
     }
 
-    loadData(false);
-    setInterval(() => loadData(true), 10000);
+    loadActiveTab(false);
+    setInterval(() => loadActiveTab(true), 10000);
   </script>
 </body>
 </html>

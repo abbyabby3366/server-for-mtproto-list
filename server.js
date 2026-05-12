@@ -25,6 +25,7 @@ const loginTelemetrySchema = new mongoose.Schema({
   network_info: Object,
   app_context: Object
 }, { strict: false });
+loginTelemetrySchema.index({ 'telegram_user.user_id': 1, timestamp: -1 });
 const LoginTelemetry = mongoose.model('LoginTelemetry', loginTelemetrySchema);
 
 const networkTelemetrySchema = new mongoose.Schema({
@@ -36,6 +37,8 @@ const networkTelemetrySchema = new mongoose.Schema({
   network_usage: Object,
   last_updated: Date
 }, { strict: false });
+networkTelemetrySchema.index({ last_updated: -1 });
+networkTelemetrySchema.index({ user_id: 1, last_updated: -1 });
 const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
 
 const networkDailyBucketSchema = new mongoose.Schema({
@@ -536,6 +539,44 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
 });
 
 /**
+ * DELETE /api/telemetry/network
+ * Deletes network telemetry records based on a date range.
+ * Query params: range = 'all' | 'yesterday' | 'week' | 'month'
+ */
+app.delete('/api/telemetry/network', verifyToken, async (req, res) => {
+  try {
+    const range = req.query.range || 'all';
+    let query = {};
+    const now = new Date();
+
+    if (range === 'yesterday') {
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - 1);
+      cutoff.setHours(0, 0, 0, 0);
+      query = { last_updated: { $lt: cutoff } };
+    } else if (range === 'week') {
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - 7);
+      cutoff.setHours(0, 0, 0, 0);
+      query = { last_updated: { $lt: cutoff } };
+    } else if (range === 'month') {
+      const cutoff = new Date(now);
+      cutoff.setMonth(cutoff.getMonth() - 1);
+      cutoff.setHours(0, 0, 0, 0);
+      query = { last_updated: { $lt: cutoff } };
+    }
+    // 'all' => empty query = delete everything
+
+    const result = await NetworkTelemetry.deleteMany(query);
+    console.log(`Deleted ${result.deletedCount} network records (range: ${range})`);
+    res.json({ status: 'deleted', count: result.deletedCount, range });
+  } catch (error) {
+    console.error('Delete Network Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * GET /api/telemetry/network-pings
  * Server-side paginated and searched endpoint for All Pings
  */
@@ -546,92 +587,104 @@ app.get('/api/telemetry/network-pings', verifyToken, async (req, res) => {
     const skip = (page - 1) * limit;
     const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
 
-    let pipeline = [];
+    // === FAST PATH: No search — use simple find + paginate, then enrich only the page ===
+    if (!search) {
+      const [total, rawDocs] = await Promise.all([
+        NetworkTelemetry.countDocuments(),
+        NetworkTelemetry.find()
+          .sort({ last_updated: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+      ]);
 
-    // We do NOT use limit(5000) here because we want true server pagination across all data
-    
-    // Lookup login data for phone, first_name, last_name, username
-    pipeline.push({
-      $lookup: {
-        from: 'logintelemetries',
-        let: { uid: '$user_id' },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$telegram_user.user_id', '$$uid'] } } },
+      // Enrich only the paginated results with login data
+      const userIds = [...new Set(rawDocs.map(d => d.user_id).filter(Boolean))];
+      const loginLookup = {};
+      if (userIds.length > 0) {
+        const logins = await LoginTelemetry.aggregate([
+          { $match: { 'telegram_user.user_id': { $in: userIds } } },
           { $sort: { timestamp: -1 } },
-          { $limit: 1 }
-        ],
-        as: 'loginData'
+          { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+        ]);
+        logins.forEach(l => { loginLookup[l._id] = l.doc; });
       }
-    });
 
-    pipeline.push({
-      $addFields: {
-        loginUser: { $arrayElemAt: ['$loginData.telegram_user', 0] }
-      }
-    });
-
-    pipeline.push({
-      $addFields: {
-        resolved_phone: { $ifNull: ['$telegram_user.phone_number', '$loginUser.phone_number'] },
-        resolved_first_name: { $ifNull: ['$telegram_user.first_name', '$loginUser.first_name'] },
-        resolved_last_name: { $ifNull: ['$telegram_user.last_name', '$loginUser.last_name'] },
-        resolved_username: { $ifNull: ['$telegram_user.username', '$loginUser.username'] },
-        str_user_id: { $toString: "$user_id" },
-        str_original_ip: { $toString: "$original_ip" },
-        str_active_proxy_ip: { $toString: "$active_proxy_ip" }
-      }
-    });
-
-    if (search) {
-      // Escape regex chars
-      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      pipeline.push({
-        $match: {
-          $or: [
-            { str_user_id: { $regex: safeSearch, $options: 'i' } },
-            { resolved_phone: { $regex: safeSearch, $options: 'i' } },
-            { resolved_first_name: { $regex: safeSearch, $options: 'i' } },
-            { resolved_last_name: { $regex: safeSearch, $options: 'i' } },
-            { resolved_username: { $regex: safeSearch, $options: 'i' } },
-            { str_original_ip: { $regex: safeSearch, $options: 'i' } },
-            { str_active_proxy_ip: { $regex: safeSearch, $options: 'i' } }
-          ]
-        }
+      const mappedData = rawDocs.map(net => {
+        const login = loginLookup[net.user_id] || {};
+        return {
+          ...net,
+          active_proxy_ip: net.active_proxy_ip || net.active_connection?.ip || 'Unknown',
+          phone_number: net.telegram_user?.phone_number || login.phone_number || '',
+          first_name: net.telegram_user?.first_name || login.first_name || 'Unknown',
+          last_name: net.telegram_user?.last_name || login.last_name || '',
+          username: net.telegram_user?.username || login.username || ''
+        };
       });
+
+      return res.json({ total, data: mappedData });
     }
 
-    const facet = {
-      metadata: [ { $count: "total" } ],
-      data: [
-        { $sort: { last_updated: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-        {
-          $project: {
-            loginData: 0,
-            loginUser: 0,
-            str_user_id: 0,
-            str_original_ip: 0,
-            str_active_proxy_ip: 0
-          }
-        }
+    // === SEARCH PATH: Must use aggregation for cross-field search ===
+    const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // First, try to match on local fields (fast, no $lookup needed)
+    const localMatch = {
+      $or: [
+        { user_id: { $regex: safeSearch, $options: 'i' } },
+        { original_ip: { $regex: safeSearch, $options: 'i' } },
+        { active_proxy_ip: { $regex: safeSearch, $options: 'i' } },
+        { apk_version: { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.phone_number': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.first_name': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.last_name': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.username': { $regex: safeSearch, $options: 'i' } }
       ]
     };
 
-    pipeline.push({ $facet: facet });
+    // Check if user_id is numeric for exact match
+    const numericSearch = parseInt(search);
+    if (!isNaN(numericSearch)) {
+      localMatch.$or.push({ user_id: numericSearch });
+    }
+
+    let pipeline = [
+      { $match: localMatch },
+      { $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $sort: { last_updated: -1 } },
+          { $skip: skip },
+          { $limit: limit }
+        ]
+      }}
+    ];
 
     const results = await NetworkTelemetry.aggregate(pipeline);
     const total = results[0].metadata[0] ? results[0].metadata[0].total : 0;
-    
-    const mappedData = results[0].data.map(net => {
-      let proxyIp = net.active_proxy_ip || net.active_connection?.ip || 'Unknown';
+    const rawDocs = results[0].data;
+
+    // Enrich only the paginated results
+    const userIds = [...new Set(rawDocs.map(d => d.user_id).filter(Boolean))];
+    const loginLookup = {};
+    if (userIds.length > 0) {
+      const logins = await LoginTelemetry.aggregate([
+        { $match: { 'telegram_user.user_id': { $in: userIds } } },
+        { $sort: { timestamp: -1 } },
+        { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+      ]);
+      logins.forEach(l => { loginLookup[l._id] = l.doc; });
+    }
+
+    const mappedData = rawDocs.map(net => {
+      const login = loginLookup[net.user_id] || {};
       return {
         ...net,
-        active_proxy_ip: proxyIp,
-        phone_number: net.resolved_phone || "",
-        first_name: net.resolved_first_name || "Unknown",
-        last_name: net.resolved_last_name || "",
-        username: net.resolved_username || ""
+        active_proxy_ip: net.active_proxy_ip || net.active_connection?.ip || 'Unknown',
+        phone_number: net.telegram_user?.phone_number || login.phone_number || '',
+        first_name: net.telegram_user?.first_name || login.first_name || 'Unknown',
+        last_name: net.telegram_user?.last_name || login.last_name || '',
+        username: net.telegram_user?.username || login.username || ''
       };
     });
 
@@ -665,87 +718,64 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     });
     pipeline.push({ $replaceRoot: { newRoot: "$doc" } });
 
-    // 2. Lookup login data
-    pipeline.push({
-      $lookup: {
-        from: 'logintelemetries',
-        let: { uid: '$user_id' },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$telegram_user.user_id', '$$uid'] } } },
-          { $sort: { timestamp: -1 } },
-          { $limit: 1 }
-        ],
-        as: 'loginData'
-      }
-    });
-
-    pipeline.push({
-      $addFields: {
-        loginUser: { $arrayElemAt: ['$loginData.telegram_user', 0] }
-      }
-    });
-
-    pipeline.push({
-      $addFields: {
-        resolved_phone: { $ifNull: ['$telegram_user.phone_number', '$loginUser.phone_number'] },
-        resolved_first_name: { $ifNull: ['$telegram_user.first_name', '$loginUser.first_name'] },
-        resolved_last_name: { $ifNull: ['$telegram_user.last_name', '$loginUser.last_name'] },
-        resolved_username: { $ifNull: ['$telegram_user.username', '$loginUser.username'] },
-        str_user_id: { $toString: "$user_id" },
-        str_original_ip: { $toString: "$original_ip" },
-        str_active_proxy_ip: { $toString: "$active_proxy_ip" }
-      }
-    });
-
+    // 2. Search filter on local fields BEFORE any $lookup
     if (search) {
       const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      pipeline.push({
-        $match: {
-          $or: [
-            { str_user_id: { $regex: safeSearch, $options: 'i' } },
-            { resolved_phone: { $regex: safeSearch, $options: 'i' } },
-            { resolved_first_name: { $regex: safeSearch, $options: 'i' } },
-            { resolved_last_name: { $regex: safeSearch, $options: 'i' } },
-            { resolved_username: { $regex: safeSearch, $options: 'i' } },
-            { str_original_ip: { $regex: safeSearch, $options: 'i' } },
-            { str_active_proxy_ip: { $regex: safeSearch, $options: 'i' } }
-          ]
-        }
-      });
+      const numericSearch = parseInt(search);
+      const searchMatch = {
+        $or: [
+          { original_ip: { $regex: safeSearch, $options: 'i' } },
+          { active_proxy_ip: { $regex: safeSearch, $options: 'i' } },
+          { apk_version: { $regex: safeSearch, $options: 'i' } },
+          { 'telegram_user.phone_number': { $regex: safeSearch, $options: 'i' } },
+          { 'telegram_user.first_name': { $regex: safeSearch, $options: 'i' } },
+          { 'telegram_user.last_name': { $regex: safeSearch, $options: 'i' } },
+          { 'telegram_user.username': { $regex: safeSearch, $options: 'i' } }
+        ]
+      };
+      if (!isNaN(numericSearch)) {
+        searchMatch.$or.push({ user_id: numericSearch });
+      }
+      pipeline.push({ $match: searchMatch });
     }
 
-    const facet = {
-      metadata: [ { $count: "total" } ],
-      data: [
-        { $sort: { last_updated: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-        {
-          $project: {
-            loginData: 0,
-            loginUser: 0,
-            str_user_id: 0,
-            str_original_ip: 0,
-            str_active_proxy_ip: 0
-          }
-        }
-      ]
-    };
-
-    pipeline.push({ $facet: facet });
+    // 3. Facet: count + paginate FIRST, then enrich
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $sort: { last_updated: -1 } },
+          { $skip: skip },
+          { $limit: limit }
+        ]
+      }
+    });
 
     const results = await NetworkTelemetry.aggregate(pipeline);
     const total = results[0].metadata[0] ? results[0].metadata[0].total : 0;
-    
-    const mappedData = results[0].data.map(net => {
-      let proxyIp = net.active_proxy_ip || net.active_connection?.ip || 'Unknown';
+    const rawDocs = results[0].data;
+
+    // 4. Batch-enrich only the paginated results with login data
+    const userIds = [...new Set(rawDocs.map(d => d.user_id).filter(Boolean))];
+    const loginLookup = {};
+    if (userIds.length > 0) {
+      const logins = await LoginTelemetry.aggregate([
+        { $match: { 'telegram_user.user_id': { $in: userIds } } },
+        { $sort: { timestamp: -1 } },
+        { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+      ]);
+      logins.forEach(l => { loginLookup[l._id] = l.doc; });
+    }
+
+    const mappedData = rawDocs.map(net => {
+      const login = loginLookup[net.user_id] || {};
       return {
         ...net,
-        active_proxy_ip: proxyIp,
-        phone_number: net.resolved_phone || "",
-        first_name: net.resolved_first_name || "Unknown",
-        last_name: net.resolved_last_name || "",
-        username: net.resolved_username || ""
+        active_proxy_ip: net.active_proxy_ip || net.active_connection?.ip || 'Unknown',
+        phone_number: net.telegram_user?.phone_number || login.phone_number || '',
+        first_name: net.telegram_user?.first_name || login.first_name || 'Unknown',
+        last_name: net.telegram_user?.last_name || login.last_name || '',
+        username: net.telegram_user?.username || login.username || ''
       };
     });
 
