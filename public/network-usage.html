@@ -98,6 +98,7 @@
               <th data-i18n>Network IP</th>
               <th data-i18n>User</th>
               <th data-i18n>APK Version</th>
+              <th data-i18n>TG Ping</th>
               <th data-i18n>Last Updated</th>
               <th data-i18n>Total Sent</th>
               <th data-i18n>Total Received</th>
@@ -107,7 +108,7 @@
             </tr>
           </thead>
           <tbody id="network-body">
-            <tr><td colspan="9">Loading...</td></tr>
+            <tr><td colspan="10">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -137,6 +138,7 @@
               <th data-i18n>Network IP</th>
               <th data-i18n>User</th>
               <th data-i18n>APK Version</th>
+              <th data-i18n>TG Ping</th>
               <th data-i18n>Date/Time</th>
               <th data-i18n>Total Sent</th>
               <th data-i18n>Total Received</th>
@@ -144,7 +146,7 @@
             </tr>
           </thead>
           <tbody id="time-body">
-            <tr><td colspan="7">Click this tab to load data.</td></tr>
+            <tr><td colspan="8">Click this tab to load data.</td></tr>
           </tbody>
         </table>
       </div>
@@ -375,11 +377,25 @@
       }, 300);
     }
 
+    function getPingDisplay(row) {
+      const ping = row.active_connection?.telegram_ping_ms;
+      const connType = row.active_connection?.type;
+      if (ping === undefined || ping === null) return { text: 'N/A', color: '#999', isFailed: false };
+      if (ping === -1) {
+        if (connType && connType !== 'Xray') return { text: 'VPN', color: '#7f8c8d', isFailed: false };
+        return { text: 'Failed', color: '#000', isFailed: true };
+      }
+      let color = '#e74c3c'; // red = bad (>800ms)
+      if (ping <= 300) color = '#27ae60'; // green = good
+      else if (ping <= 800) color = '#f39c12'; // yellow = normal
+      return { text: ping + 'ms', color, isFailed: false };
+    }
+
     function renderUserTable() {
       const netBody = document.getElementById('network-body');
       netBody.innerHTML = '';
       if (uniqueUsersArray.length === 0) {
-        netBody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">No network data found.</td></tr>';
+        netBody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:#666;">No network data found.</td></tr>';
         document.getElementById('pagination-user').style.display = 'none';
         document.getElementById('pagination-user-top').style.display = 'none';
         return;
@@ -401,6 +417,10 @@
       uniqueUsersArray.forEach((row, index) => {
         const tr = document.createElement('tr');
         tr.id = 'user-row-' + row.user_id;
+        const pingInfo = getPingDisplay(row);
+        if (pingInfo.isFailed) {
+          tr.style.backgroundColor = '#fce4ec';
+        }
         tr.innerHTML = `
           <td>
             <strong style="color: #2980b9;">${row.active_proxy_ip || 'Unknown'}</strong><br>
@@ -408,6 +428,7 @@
           </td>
           <td>${row.first_name || 'Unknown'} ${row.last_name || ''} <br> <span style="color:#666">${row.phone_number || row.user_id}</span></td>
           <td>${row.apk_version || 'Unknown'}</td>
+          <td style="font-weight:bold; color:${pingInfo.color};">${pingInfo.text}</td>
           <td>${new Date(row.last_updated).toLocaleString()}</td>
           <td class="bytes">${formatBytes(row.network_usage?.total_bytes_sent)}</td>
           <td class="bytes">${formatBytes(row.network_usage?.total_bytes_received)}</td>
@@ -431,7 +452,7 @@
       const timeBody = document.getElementById('time-body');
       timeBody.innerHTML = '';
       if (allBucketsArray.length === 0) {
-        timeBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No historical data found.</td></tr>';
+        timeBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:#666;">No historical data found.</td></tr>';
         document.getElementById('pagination-time').style.display = 'none';
         document.getElementById('pagination-time-top').style.display = 'none';
         return;
@@ -462,6 +483,11 @@
           displayName = row.user_id;
         }
 
+        const pingInfo = getPingDisplay(row);
+        if (pingInfo.isFailed) {
+          tr.style.backgroundColor = '#fce4ec';
+        }
+
         const dt = new Date(row.last_updated || row.timestamp);
         tr.innerHTML = `
           <td>
@@ -470,6 +496,7 @@
           </td>
           <td>${displayName}</td>
           <td>${row.apk_version || 'Unknown'}</td>
+          <td style="font-weight:bold; color:${pingInfo.color};">${pingInfo.text}</td>
           <td>
             <strong>${dt.toLocaleDateString()}</strong><br>
             <span style="color:#666; font-size:11px;">${dt.toLocaleTimeString()}</span>
@@ -496,7 +523,7 @@
       try {
         if (activeTab === 'tab-user') {
           if (!isAutoRefresh) {
-            document.getElementById('network-body').innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
+            document.getElementById('network-body').innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
           }
           const res = await fetch(`/api/telemetry/network-users?page=${currentPageUser}&limit=${itemsPerPageUser}&search=${encodeURIComponent(currentSearchTerm)}`);
           const usersData = await res.json();
@@ -525,7 +552,7 @@
           }
         } else if (activeTab === 'tab-time') {
           if (!isAutoRefresh) {
-            document.getElementById('time-body').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
+            document.getElementById('time-body').innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:#666;">Loading...</td></tr>';
           }
           const res = await fetch(`/api/telemetry/network-pings?page=${currentPageTime}&limit=${itemsPerPageTime}&search=${encodeURIComponent(currentSearchTerm)}`);
           const pingsData = await res.json();
