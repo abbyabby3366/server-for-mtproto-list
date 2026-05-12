@@ -305,6 +305,83 @@
     </div>
 
     <div class="card">
+      <h2>External Redirects</h2>
+      <p
+        style="
+          color: #666;
+          margin-top: -10px;
+          margin-bottom: 15px;
+          font-size: 12px;
+        "
+      >
+        Update the APK download redirect link on external domains (e.g., talkpro.cc).
+      </p>
+      <form id="externalRedirectForm">
+        <div class="form-group">
+          <label for="extDownloadUrl">Download URL</label>
+          <input
+            type="text"
+            id="extDownloadUrl"
+            name="extDownloadUrl"
+            placeholder="https://d1crnjc8yszup2.cloudfront.net/private/apk/..."
+            required
+            readonly
+            style="background: #f8f9fa;"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="extToken">Authorization Token</label>
+          <div style="display: flex; gap: 10px;">
+            <input
+              type="text"
+              id="extToken"
+              name="extToken"
+              placeholder="Bearer token (without the 'Bearer ' prefix)"
+              required
+              readonly
+              style="background: #f8f9fa;"
+            />
+            <button type="button" id="extEditBtn" class="btn" style="background: #f39c12; white-space: nowrap;" onclick="enableExternalEdit()">
+              Edit Config
+            </button>
+            <button type="button" id="extSaveConfigBtn" class="btn" style="background: #2ecc71; white-space: nowrap; display: none;" onclick="saveExternalConfig()">
+              Save Token/URL to DB
+              <span class="loader" id="extSaveLoader">(Saving...)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Domains to Update</label>
+          <div style="display: flex; gap: 15px; margin-top: 5px; flex-wrap: wrap;">
+            <div class="checkbox-group" style="margin-bottom: 0;">
+              <input type="checkbox" id="domainCc" value="talkpro.cc" checked />
+              <label for="domainCc">talkpro.cc</label>
+            </div>
+            <div class="checkbox-group" style="margin-bottom: 0;">
+              <input type="checkbox" id="domainXyz" value="talkspro.xyz" />
+              <label for="domainXyz">talkspro.xyz</label>
+            </div>
+            <div class="checkbox-group" style="margin-bottom: 0;">
+              <input type="checkbox" id="domainOrg" value="talkpro.org" />
+              <label for="domainOrg">talkpro.org</label>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <button type="submit" id="extSubmitBtn" class="btn">
+            Update External Redirects
+            <span class="loader" id="extUpdateLoader">(Updating...)</span>
+          </button>
+        </div>
+      </form>
+      <div id="extNotification" class="notification"></div>
+      <pre id="extResults" style="display: none; background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 10px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+    </div>
+
+    <div class="card">
       <h2>Transit Node IPs</h2>
       <p
         style="
@@ -486,6 +563,92 @@
           }, 4000);
         }
 
+        // ===== EXTERNAL REDIRECTS =====
+        const extForm = document.getElementById("externalRedirectForm");
+        const extSubmitBtn = document.getElementById("extSubmitBtn");
+        const extNotification = document.getElementById("extNotification");
+        const extResults = document.getElementById("extResults");
+
+        extForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          extSubmitBtn.classList.add("loading");
+          extSubmitBtn.disabled = true;
+          extResults.style.display = 'none';
+
+          const domains = [];
+          if (document.getElementById("domainCc").checked) domains.push("talkpro.cc");
+          if (document.getElementById("domainXyz").checked) domains.push("talkspro.xyz");
+          if (document.getElementById("domainOrg").checked) domains.push("talkpro.org");
+
+          const payload = {
+            downloadUrl: document.getElementById("extDownloadUrl").value,
+            token: document.getElementById("extToken").value,
+            domains: domains
+          };
+
+          if (domains.length === 0) {
+            showExtNotification("Please select at least one domain.", "error");
+            extSubmitBtn.classList.remove("loading");
+            extSubmitBtn.disabled = false;
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/external-redirects", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              const allSuccess = data.results.every(r => r.status === 'success');
+              if (allSuccess) {
+                showExtNotification("All redirects updated successfully!", "success");
+              } else {
+                showExtNotification("Some updates failed. Check results below.", "error");
+              }
+              extResults.textContent = JSON.stringify(data.results, null, 2);
+              extResults.style.display = 'block';
+            } else {
+              showExtNotification(data.error || "Failed to update redirects.", "error");
+            }
+          } catch (error) {
+            console.error("Error updating external redirects:", error);
+            showExtNotification("Error updating external redirects.", "error");
+          } finally {
+            extSubmitBtn.classList.remove("loading");
+            extSubmitBtn.disabled = false;
+          }
+        });
+
+        function showExtNotification(message, type) {
+          extNotification.textContent = message;
+          extNotification.className = `notification ${type}`;
+          setTimeout(() => {
+            extNotification.className = "notification";
+          }, 5000);
+        }
+
+        // Fetch external config on load
+        async function loadExternalConfig() {
+          try {
+            const response = await fetch("/api/external-redirect-config");
+            if (response.ok) {
+              const data = await response.json();
+              document.getElementById("extDownloadUrl").value = data.downloadUrl || "";
+              document.getElementById("extToken").value = data.token || "";
+            }
+          } catch (error) {
+            console.error("Error loading external config:", error);
+          }
+        }
+        await loadExternalConfig();
+
         // ===== TRANSIT IPS =====
         await loadTransitIps();
       });
@@ -606,6 +769,54 @@
           saveBtn.classList.remove("loading");
           saveBtn.disabled = false;
         }
+      }
+
+      async function saveExternalConfig() {
+        const saveBtn = document.getElementById("extSaveConfigBtn");
+        const downloadUrl = document.getElementById("extDownloadUrl").value;
+        const token = document.getElementById("extToken").value;
+
+        saveBtn.classList.add("loading");
+        saveBtn.disabled = true;
+
+        try {
+          const response = await fetch("/api/external-redirect-config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ downloadUrl, token }),
+          });
+
+          if (response.ok) {
+            showExtNotification("Configuration saved to DB successfully!", "success");
+            disableExternalEdit();
+          } else {
+            showExtNotification("Failed to save configuration.", "error");
+          }
+        } catch (error) {
+          console.error("Error saving external config:", error);
+          showExtNotification("Error saving configuration.", "error");
+        } finally {
+          saveBtn.classList.remove("loading");
+          saveBtn.disabled = false;
+        }
+      }
+
+      function enableExternalEdit() {
+        document.getElementById("extDownloadUrl").readOnly = false;
+        document.getElementById("extDownloadUrl").style.background = "white";
+        document.getElementById("extToken").readOnly = false;
+        document.getElementById("extToken").style.background = "white";
+        document.getElementById("extEditBtn").style.display = "none";
+        document.getElementById("extSaveConfigBtn").style.display = "inline-block";
+      }
+
+      function disableExternalEdit() {
+        document.getElementById("extDownloadUrl").readOnly = true;
+        document.getElementById("extDownloadUrl").style.background = "#f8f9fa";
+        document.getElementById("extToken").readOnly = true;
+        document.getElementById("extToken").style.background = "#f8f9fa";
+        document.getElementById("extEditBtn").style.display = "inline-block";
+        document.getElementById("extSaveConfigBtn").style.display = "none";
       }
 
       function showIpNotification(message, type) {

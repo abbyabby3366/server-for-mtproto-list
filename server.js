@@ -71,6 +71,13 @@ const transitIpsSchema = new mongoose.Schema({
 });
 const TransitIps = mongoose.model('TransitIps', transitIpsSchema);
 
+const externalRedirectConfigSchema = new mongoose.Schema({
+  token: String,
+  downloadUrl: String
+});
+const ExternalRedirectConfig = mongoose.model('ExternalRedirectConfig', externalRedirectConfigSchema);
+
+
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -385,6 +392,80 @@ app.post('/api/android/version', async (req, res) => {
   } catch (error) {
     console.error('Error updating version metadata:', error.message);
     res.status(500).json({ error: 'Failed to update version metadata' });
+  }
+});
+
+/**
+ * POST /api/external-redirects
+ * Updates the external download URLs on specified domains.
+ */
+app.post('/api/external-redirects', verifyToken, async (req, res) => {
+  try {
+    const { downloadUrl, token, domains } = req.body;
+    if (!downloadUrl || !token || !Array.isArray(domains) || domains.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const results = [];
+    for (const domain of domains) {
+      try {
+        const response = await fetch(`https://${domain}/admin/download`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ download_url: downloadUrl })
+        });
+        
+        if (response.ok) {
+          results.push({ domain, status: 'success' });
+        } else {
+          const text = await response.text();
+          results.push({ domain, status: 'error', error: `HTTP ${response.status}: ${text}` });
+        }
+      } catch (err) {
+        results.push({ domain, status: 'error', error: err.message });
+      }
+    }
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Error updating external redirects:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.get('/api/external-redirect-config', verifyToken, async (req, res) => {
+  try {
+    let config = await ExternalRedirectConfig.findOne();
+    if (!config) {
+      return res.json({ 
+        token: '5157593d8b028bd6fb684767d8127dc89780d2d8377edf555c153e3878b9e5dc',
+        downloadUrl: ''
+      });
+    }
+    res.json(config);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load config' });
+  }
+});
+
+app.post('/api/external-redirect-config', verifyToken, async (req, res) => {
+  try {
+    const { token, downloadUrl } = req.body;
+    let config = await ExternalRedirectConfig.findOne();
+    if (config) {
+      if (token !== undefined) config.token = token;
+      if (downloadUrl !== undefined) config.downloadUrl = downloadUrl;
+      await config.save();
+    } else {
+      config = new ExternalRedirectConfig({ token, downloadUrl });
+      await config.save();
+    }
+    res.json({ status: 'saved' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save config' });
   }
 });
 
