@@ -108,7 +108,7 @@ const translations = {
   "Unknown": "未知"
 };
 
-const lang = localStorage.getItem('lang') || 'en';
+const lang = localStorage.getItem('lang') || 'zh';
 
 window.t = function(text) {
     if (lang === 'zh') {
