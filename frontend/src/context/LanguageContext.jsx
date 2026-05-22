@@ -1,3 +1,7 @@
+import React, { createContext, useState, useContext, useEffect } from 'react';
+
+const LanguageContext = createContext();
+
 const translations = {
   // Navigation
   "Recent Logins": "最近登錄",
@@ -17,8 +21,13 @@ const translations = {
   "Details": "詳情",
   "View Stats": "查看統計",
   "View Details": "查看詳情",
+  "Foreground Status": "前台狀態",
+  "All Traffic": "所有流量",
+  "Foreground Only": "僅前台",
+  "Background Only": "僅後台",
+  "Total Sent / Received": "發送 / 接收總計",
   "App Usage Statistics": "應用使用統計",
-  "Active Today": "今日活躍",
+  "Active Users Today": "今日活躍用戶",
   "Total Users": "總用戶數",
   "Total Data Sent (All-Time):": "總數據發送 (歷史總計):",
   "Total Data Received (All-Time):": "總數據接收 (歷史總計):",
@@ -82,6 +91,8 @@ const translations = {
   "Daily Active Users": "每日活躍用戶",
   "Daily New Users": "每日新增用戶",
   "Active Users (Period)": "活躍用戶 (所選期間)",
+  "Active Users (Foreground Only)": "活躍用戶 (僅前台)",
+  "Active Users (Foreground + Background)": "活躍用戶 (前台+後台)",
   "New Users (Period)": "新增用戶 (所選期間)",
   "Total Users (All-time)": "總用戶數 (歷史)",
   "Avg Total Upload / User": "平均用戶總發送流量",
@@ -105,76 +116,50 @@ const translations = {
   
   // General / Misc
   "Loading...": "加載中...",
-  "Unknown": "未知"
+  "Unknown": "未知",
+  "English": "English",
+  "中文": "中文",
+  "Logout": "登出",
+  "Change Password": "修改密碼",
+  "Delete": "刪除",
+  "Actions": "操作",
+  "Role": "角色",
+  "Username": "用戶名",
+  "Password": "密碼",
+  "Add User": "添加用戶",
+  "Add New User": "添加新用戶",
+  "Staff": "員工",
+  "Admin": "管理員",
+  "Save": "保存",
+  "Saving...": "保存中...",
+  "Updating...": "更新中...",
+  "Failed to load user list": "加載用戶列表失敗",
+  "You do not have permission to view users.": "您沒有查看用戶的權限。"
 };
 
-const lang = localStorage.getItem('lang') || 'zh';
+export const LanguageProvider = ({ children }) => {
+  const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'zh');
 
-window.t = function(text) {
+  useEffect(() => {
+    localStorage.setItem('lang', lang);
+  }, [lang]);
+
+  const t = (text) => {
     if (lang === 'zh') {
-        return translations[text] || text;
+      return translations[text] || text;
     }
     return text;
+  };
+
+  const toggleLang = () => {
+    setLang((prev) => (prev === 'en' ? 'zh' : 'en'));
+  };
+
+  return (
+    <LanguageContext.Provider value={{ lang, t, toggleLang }}>
+      {children}
+    </LanguageContext.Provider>
+  );
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    const nav = document.querySelector('nav');
-    if (nav) {
-        const btn = document.createElement('button');
-        btn.id = 'langBtn';
-        btn.style = 'padding: 4px 10px; background: #f39c12; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap;';
-        btn.innerText = lang === 'en' ? '中文' : 'English';
-        btn.onclick = () => {
-            localStorage.setItem('lang', lang === 'en' ? 'zh' : 'en');
-            window.location.reload();
-        };
-        nav.appendChild(btn);
-    }
-
-    if (lang === 'zh') {
-        translateDOM(document.body);
-        
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(m => {
-                m.addedNodes.forEach(node => {
-                    if (node.nodeType === 1) translateDOM(node);
-                });
-            });
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    }
-});
-
-function translateDOM(node) {
-    if (lang === 'en') return;
-    
-    // Quick text translation for elements with data-i18n specifically 
-    // to handle static divs that don't have text directly inside but we want to translate their textContent
-    const i18nNodes = node.querySelectorAll ? node.querySelectorAll('[data-i18n]') : [];
-    i18nNodes.forEach(n => {
-        const txt = n.innerText.trim();
-        if (translations[txt]) {
-            n.innerText = translations[txt];
-            n.removeAttribute('data-i18n'); // prevent re-translation
-        }
-    });
-
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
-    let n;
-    while (n = walker.nextNode()) {
-        const trimmed = n.nodeValue.trim();
-        if (trimmed && translations[trimmed]) {
-            n.nodeValue = n.nodeValue.replace(trimmed, translations[trimmed]);
-        }
-    }
-    
-    if (node.querySelectorAll) {
-        const inputs = node.querySelectorAll('input[placeholder], textarea[placeholder]');
-        inputs.forEach(input => {
-            const ph = input.getAttribute('placeholder');
-            if (translations[ph]) {
-                input.setAttribute('placeholder', translations[ph]);
-            }
-        });
-    }
-}
+export const useLanguage = () => useContext(LanguageContext);

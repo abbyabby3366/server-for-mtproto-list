@@ -65,6 +65,31 @@ const androidVersionSchema = new mongoose.Schema({
 });
 const AndroidVersion = mongoose.model('AndroidVersion', androidVersionSchema);
 
+const androidVersionLogSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  user: {
+    username: String,
+    role: String
+  },
+  previousConfig: Object,
+  newConfig: Object,
+  changedFields: [String]
+});
+const AndroidVersionLog = mongoose.model('AndroidVersionLog', androidVersionLogSchema);
+
+const externalRedirectLogSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  user: {
+    username: String,
+    role: String
+  },
+  downloadUrl: String,
+  token: String,
+  domains: [String],
+  results: [Object]
+});
+const ExternalRedirectLog = mongoose.model('ExternalRedirectLog', externalRedirectLogSchema);
+
 const transitIpsSchema = new mongoose.Schema({
   ips: [String],
   remarks: String
@@ -102,7 +127,7 @@ mongoose.connection.once('open', async () => {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
 
 // Authentication Middleware
 const verifyToken = (req, res, next) => {
@@ -335,13 +360,6 @@ app.post('/api/transit-ips', verifyToken, async (req, res) => {
   }
 });
 
-/**
- * GET /configs
- * Serves the configuration interface.
- */
-app.get('/configs', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'configs.html'));
-});
 
 /**
  * GET /api/android/version
@@ -373,10 +391,62 @@ app.get('/api/android/version', async (req, res) => {
  * POST /api/android/version
  * Updates the version metadata for Android app self-update mechanism.
  */
-app.post('/api/android/version', async (req, res) => {
+app.post('/api/android/version', verifyToken, async (req, res) => {
   try {
     const payload = req.body;
     let version = await AndroidVersion.findOne();
+    
+    const fieldsToCheck = ['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'];
+    let prevObj = null;
+    let newObj = {};
+
+    if (version) {
+      prevObj = version.toObject();
+      newObj = {
+        versionCode: payload.versionCode !== undefined ? payload.versionCode : prevObj.versionCode,
+        versionName: payload.versionName !== undefined ? payload.versionName : prevObj.versionName,
+        downloadUrl: payload.downloadUrl !== undefined ? payload.downloadUrl : prevObj.downloadUrl,
+        changelog: payload.changelog !== undefined ? payload.changelog : prevObj.changelog,
+        forceUpdate: payload.forceUpdate !== undefined ? payload.forceUpdate : prevObj.forceUpdate
+      };
+    } else {
+      newObj = {
+        versionCode: payload.versionCode || 0,
+        versionName: payload.versionName || '',
+        downloadUrl: payload.downloadUrl || '',
+        changelog: payload.changelog || '',
+        forceUpdate: !!payload.forceUpdate
+      };
+    }
+
+    const changedFields = [];
+    fieldsToCheck.forEach(field => {
+      const prevVal = prevObj ? prevObj[field] : undefined;
+      const newVal = newObj[field];
+      if (prevVal !== newVal) {
+        changedFields.push(field);
+      }
+    });
+
+    if (changedFields.length > 0) {
+      const logEntry = new AndroidVersionLog({
+        user: {
+          username: req.user.username,
+          role: req.user.role
+        },
+        previousConfig: prevObj ? {
+          versionCode: prevObj.versionCode,
+          versionName: prevObj.versionName,
+          downloadUrl: prevObj.downloadUrl,
+          changelog: prevObj.changelog,
+          forceUpdate: prevObj.forceUpdate
+        } : null,
+        newConfig: newObj,
+        changedFields
+      });
+      await logEntry.save();
+    }
+
     if (version) {
       if (payload.versionCode !== undefined) version.versionCode = payload.versionCode;
       if (payload.versionName !== undefined) version.versionName = payload.versionName;
@@ -392,6 +462,20 @@ app.post('/api/android/version', async (req, res) => {
   } catch (error) {
     console.error('Error updating version metadata:', error.message);
     res.status(500).json({ error: 'Failed to update version metadata' });
+  }
+});
+
+/**
+ * GET /api/android/version/logs
+ * Returns historical changelogs for Android app version configuration.
+ */
+app.get('/api/android/version/logs', verifyToken, async (req, res) => {
+  try {
+    const logs = await AndroidVersionLog.find().sort({ timestamp: -1 }).limit(100);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching version logs:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -429,9 +513,39 @@ app.post('/api/external-redirects', verifyToken, async (req, res) => {
       }
     }
 
+    try {
+      const logEntry = new ExternalRedirectLog({
+        user: {
+          username: req.user.username,
+          role: req.user.role
+        },
+        downloadUrl,
+        token,
+        domains,
+        results
+      });
+      await logEntry.save();
+    } catch (logErr) {
+      console.error('Error saving external redirect log:', logErr);
+    }
+
     res.json({ results });
   } catch (error) {
     console.error('Error updating external redirects:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * GET /api/external-redirects/logs
+ * Returns historical changelogs for External Redirect configuration.
+ */
+app.get('/api/external-redirects/logs', verifyToken, async (req, res) => {
+  try {
+    const logs = await ExternalRedirectLog.find().sort({ timestamp: -1 }).limit(100);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching external redirect logs:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -501,13 +615,6 @@ app.post('/proxies', apiKeyAuth, (req, res) => {
   }
 });
 
-/**
- * GET /
- * Root endpoint redirects to configs page.
- */
-app.get('/', (req, res) => {
-  res.redirect('/configs.html');
-});
 
 /**
  * POST /user-login-details
@@ -612,7 +719,10 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
       };
     }));
     
-    res.json({ logins, network });
+    const uniqueUsersCount = await NetworkTelemetry.distinct('user_id');
+    const totalUniqueUsers = uniqueUsersCount.filter(Boolean).length;
+    
+    res.json({ logins, network, totalUniqueUsers });
   } catch (error) {
     console.error('Stats Error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -768,12 +878,26 @@ app.get('/api/telemetry/network-pings', verifyToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
     const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
+    const foreground = req.query.foreground;
 
     // === FAST PATH: No search — use simple find + paginate, then enrich only the page ===
     if (!search) {
+      const query = {};
+      if (foreground === 'true') {
+        query.$or = [
+          { delta_sent: { $gt: 0 } },
+          { delta_received: { $gt: 0 } }
+        ];
+      } else if (foreground === 'false') {
+        query.$and = [
+          { $or: [ { delta_sent: { $exists: false } }, { delta_sent: { $lte: 0 } } ] },
+          { $or: [ { delta_received: { $exists: false } }, { delta_received: { $lte: 0 } } ] }
+        ];
+      }
+
       const [total, rawDocs] = await Promise.all([
-        NetworkTelemetry.countDocuments(),
-        NetworkTelemetry.find()
+        NetworkTelemetry.countDocuments(query),
+        NetworkTelemetry.find(query)
           .sort({ last_updated: -1 })
           .skip(skip)
           .limit(limit)
@@ -830,8 +954,25 @@ app.get('/api/telemetry/network-pings', verifyToken, async (req, res) => {
       localMatch.$or.push({ user_id: numericSearch });
     }
 
+    const matchQuery = { $and: [ localMatch ] };
+    if (foreground === 'true') {
+      matchQuery.$and.push({
+        $or: [
+          { delta_sent: { $gt: 0 } },
+          { delta_received: { $gt: 0 } }
+        ]
+      });
+    } else if (foreground === 'false') {
+      matchQuery.$and.push({
+        $and: [
+          { $or: [ { delta_sent: { $exists: false } }, { delta_sent: { $lte: 0 } } ] },
+          { $or: [ { delta_received: { $exists: false } }, { delta_received: { $lte: 0 } } ] }
+        ]
+      });
+    }
+
     let pipeline = [
-      { $match: localMatch },
+      { $match: matchQuery },
       { $facet: {
         metadata: [{ $count: 'total' }],
         data: [
@@ -887,6 +1028,7 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
     const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
+    const foreground = req.query.foreground;
 
     let pipeline = [];
 
@@ -900,7 +1042,8 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     });
     pipeline.push({ $replaceRoot: { newRoot: "$doc" } });
 
-    // 2. Search filter on local fields BEFORE any $lookup
+    // 2. Search & Foreground filter on local fields BEFORE any $lookup
+    const matchFilters = [];
     if (search) {
       const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const numericSearch = parseInt(search);
@@ -918,7 +1061,27 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
       if (!isNaN(numericSearch)) {
         searchMatch.$or.push({ user_id: numericSearch });
       }
-      pipeline.push({ $match: searchMatch });
+      matchFilters.push(searchMatch);
+    }
+
+    if (foreground === 'true') {
+      matchFilters.push({
+        $or: [
+          { delta_sent: { $gt: 0 } },
+          { delta_received: { $gt: 0 } }
+        ]
+      });
+    } else if (foreground === 'false') {
+      matchFilters.push({
+        $and: [
+          { $or: [ { delta_sent: { $exists: false } }, { delta_sent: { $lte: 0 } } ] },
+          { $or: [ { delta_received: { $exists: false } }, { delta_received: { $lte: 0 } } ] }
+        ]
+      });
+    }
+
+    if (matchFilters.length > 0) {
+      pipeline.push({ $match: { $and: matchFilters } });
     }
 
     // 3. Facet: count + paginate FIRST, then enrich
@@ -1040,15 +1203,38 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     }
 
     let dailyActiveUsers = 0;
+    let dailyActiveUsersTotal = 0;
+    let dailyActiveUsersForeground = 0;
     let dailyNewUsers = 0;
 
     if (timeframe === 'all_time') {
       const allUsers = await NetworkTelemetry.distinct("user_id");
-      dailyActiveUsers = allUsers.length;
+      dailyActiveUsersTotal = allUsers.length;
+      
+      const fgUsers = await NetworkTelemetry.distinct("user_id", {
+        $or: [
+          { delta_sent: { $gt: 0 } },
+          { delta_received: { $gt: 0 } }
+        ]
+      });
+      dailyActiveUsersForeground = fgUsers.length;
     } else {
       const activeRaw = await NetworkTelemetry.distinct("user_id", query);
-      dailyActiveUsers = activeRaw.length;
+      dailyActiveUsersTotal = activeRaw.length;
+
+      const fgQuery = {
+        ...query,
+        $or: [
+          { delta_sent: { $gt: 0 } },
+          { delta_received: { $gt: 0 } }
+        ]
+      };
+      const fgRaw = await NetworkTelemetry.distinct("user_id", fgQuery);
+      dailyActiveUsersForeground = fgRaw.length;
     }
+    
+    // Retain dailyActiveUsers for backward compatibility and averages
+    dailyActiveUsers = dailyActiveUsersTotal;
 
     const totalUsersRaw = await NetworkTelemetry.distinct("user_id");
     const totalUsers = totalUsersRaw.length;
@@ -1102,7 +1288,8 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
         { $group: {
             _id: "$user_id",
             today_sent: { $sum: "$delta_sent" },
-            today_received: { $sum: "$delta_received" }
+            today_received: { $sum: "$delta_received" },
+            telegram_user: { $first: "$telegram_user" }
         }}
       ]);
     }
@@ -1120,7 +1307,18 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     const avgDailySent = dailyActiveUsers ? (sumDailySent / dailyActiveUsers) : 0;
     const avgDailyReceived = dailyActiveUsers ? (sumDailyReceived / dailyActiveUsers) : 0;
     
-    let topUsers = Object.values(userTrafficMap).sort((a, b) => b.total_traffic - a.total_traffic).slice(0, 20);
+    let periodUserTraffic = [];
+    if (timeframe === 'all_time') {
+      periodUserTraffic = Object.values(userTrafficMap);
+    } else {
+      periodUserTraffic = periodStatsRaw.map(u => ({
+        user_id: u._id,
+        telegram_user: u.telegram_user,
+        total_traffic: (u.today_sent || 0) + (u.today_received || 0)
+      }));
+    }
+
+    let topUsers = periodUserTraffic.sort((a, b) => b.total_traffic - a.total_traffic).slice(0, 20);
     
     topUsers = topUsers.map(tu => {
        const userFirstPing = firstPings.find(fp => fp._id === tu.user_id);
@@ -1134,6 +1332,8 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     
     res.json({
       dailyActiveUsers,
+      dailyActiveUsersForeground,
+      dailyActiveUsersTotal,
       dailyNewUsers,
       totalUsers,
       avgTotalSent,
@@ -1295,6 +1495,11 @@ app.delete('/api/telemetry/network', verifyToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
+});
+
+// Wildcard handler directs all other GET requests to the index.html for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
