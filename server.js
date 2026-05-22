@@ -663,17 +663,33 @@ app.post('/network-usage', async (req, res) => {
     
     let deltaSent = payload.network_usage?.total_bytes_sent || 0;
     let deltaReceived = payload.network_usage?.total_bytes_received || 0;
+    let deltaMobileSent = payload.network_usage?.mobile_bytes_sent || 0;
+    let deltaMobileReceived = payload.network_usage?.mobile_bytes_received || 0;
+    let deltaWifiSent = payload.network_usage?.wifi_bytes_sent || 0;
+    let deltaWifiReceived = payload.network_usage?.wifi_bytes_received || 0;
     
     if (existing && existing.network_usage) {
        const oldSent = existing.network_usage.total_bytes_sent || 0;
        const oldRecv = existing.network_usage.total_bytes_received || 0;
+       const oldMobileSent = existing.network_usage.mobile_bytes_sent || 0;
+       const oldMobileRecv = existing.network_usage.mobile_bytes_received || 0;
+       const oldWifiSent = existing.network_usage.wifi_bytes_sent || 0;
+       const oldWifiRecv = existing.network_usage.wifi_bytes_received || 0;
        
        if (deltaSent >= oldSent) deltaSent = deltaSent - oldSent;
        if (deltaReceived >= oldRecv) deltaReceived = deltaReceived - oldRecv;
+       if (deltaMobileSent >= oldMobileSent) deltaMobileSent = deltaMobileSent - oldMobileSent;
+       if (deltaMobileReceived >= oldMobileRecv) deltaMobileReceived = deltaMobileReceived - oldMobileRecv;
+       if (deltaWifiSent >= oldWifiSent) deltaWifiSent = deltaWifiSent - oldWifiSent;
+       if (deltaWifiReceived >= oldWifiRecv) deltaWifiReceived = deltaWifiReceived - oldWifiRecv;
     }
     
     payload.delta_sent = deltaSent;
     payload.delta_received = deltaReceived;
+    payload.delta_mobile_sent = deltaMobileSent;
+    payload.delta_mobile_received = deltaMobileReceived;
+    payload.delta_wifi_sent = deltaWifiSent;
+    payload.delta_wifi_received = deltaWifiReceived;
 
     delete payload._id;
     delete payload.__v;
@@ -1348,6 +1364,236 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+/**
+ * GET /api/telemetry/traffic-report
+ * Returns time-series aggregated stats and summaries for custom reporting
+ */
+app.get('/api/telemetry/traffic-report', verifyToken, async (req, res) => {
+  try {
+    const { timeframe = 'all_time', interval, user_id, active_proxy_ip } = req.query;
+    const now = new Date();
+    let startTime, endTime;
+    let query = {};
+
+    if (timeframe === 'last_15_mins') {
+      startTime = new Date(now.getTime() - 15 * 60 * 1000);
+      endTime = now;
+      query.last_updated = { $gte: startTime, $lte: endTime };
+    } else if (timeframe === 'last_hour') {
+      startTime = new Date(now.getTime() - 60 * 60 * 1000);
+      endTime = now;
+      query.last_updated = { $gte: startTime, $lte: endTime };
+    } else if (timeframe === 'today') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+    } else if (timeframe === 'yesterday') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+    } else if (timeframe === 'this_week') {
+      startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Sunday
+      endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      query.last_updated = { $gte: startTime, $lt: endTime };
+    }
+
+    if (user_id) {
+      query.user_id = parseInt(user_id);
+    }
+    if (active_proxy_ip) {
+      query.active_proxy_ip = active_proxy_ip;
+    }
+
+    let selectInterval = interval;
+    if (!selectInterval) {
+      if (timeframe === 'last_15_mins' || timeframe === 'last_hour') {
+        selectInterval = '5m';
+      } else if (timeframe === 'today' || timeframe === 'yesterday') {
+        selectInterval = '1h';
+      } else {
+        selectInterval = '1d';
+      }
+    }
+
+    const pings = await NetworkTelemetry.find(query).sort({ last_updated: 1 }).lean();
+
+    let totalBytesSent = 0;
+    let totalBytesReceived = 0;
+    let totalMobileSent = 0;
+    let totalMobileReceived = 0;
+    let totalWifiSent = 0;
+    let totalWifiReceived = 0;
+    let totalPings = 0;
+    let failedPings = 0;
+
+    const userStats = {};
+    const xrayStats = {};
+    const timelineMap = {};
+
+    pings.forEach(ping => {
+      const ds = ping.delta_sent || 0;
+      const dr = ping.delta_received || 0;
+
+      let dms = ping.delta_mobile_sent || 0;
+      let dmr = ping.delta_mobile_received || 0;
+      let dws = ping.delta_wifi_sent || 0;
+      let dwr = ping.delta_wifi_received || 0;
+
+      if (dms === 0 && dmr === 0 && dws === 0 && dwr === 0) {
+        const mobileTotal = (ping.network_usage?.mobile_bytes_sent || 0) + (ping.network_usage?.mobile_bytes_received || 0);
+        const wifiTotal = (ping.network_usage?.wifi_bytes_sent || 0) + (ping.network_usage?.wifi_bytes_received || 0);
+        const total = mobileTotal + wifiTotal;
+        if (total > 0) {
+          dms = Math.round(ds * (ping.network_usage?.mobile_bytes_sent || 0) / total);
+          dmr = Math.round(dr * (ping.network_usage?.mobile_bytes_received || 0) / total);
+          dws = ds - dms;
+          dwr = dr - dmr;
+        } else {
+          dws = ds;
+          dwr = dr;
+        }
+      }
+
+      const pingMs = ping.active_connection?.telegram_ping_ms;
+      const connType = ping.active_connection?.type;
+      const isFailed = (pingMs === -1) && (connType !== 'VPN');
+
+      totalBytesSent += ds;
+      totalBytesReceived += dr;
+      totalMobileSent += dms;
+      totalMobileReceived += dmr;
+      totalWifiSent += dws;
+      totalWifiReceived += dwr;
+      totalPings += 1;
+      if (isFailed) failedPings += 1;
+
+      const date = new Date(ping.last_updated);
+      let bucketKey;
+      if (selectInterval === '5m') {
+        const minutes = date.getMinutes();
+        const roundedMin = minutes - (minutes % 5);
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), roundedMin, 0, 0);
+        bucketKey = d.toISOString();
+      } else if (selectInterval === '1h') {
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), 0, 0, 0);
+        bucketKey = d.toISOString();
+      } else {
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+        bucketKey = d.toISOString();
+      }
+
+      if (!timelineMap[bucketKey]) {
+        timelineMap[bucketKey] = {
+          timestamp: bucketKey,
+          bytesSent: 0,
+          bytesReceived: 0,
+          mobileSent: 0,
+          mobileReceived: 0,
+          wifiSent: 0,
+          wifiReceived: 0,
+          totalPings: 0,
+          failedPings: 0
+        };
+      }
+      timelineMap[bucketKey].bytesSent += ds;
+      timelineMap[bucketKey].bytesReceived += dr;
+      timelineMap[bucketKey].mobileSent += dms;
+      timelineMap[bucketKey].mobileReceived += dmr;
+      timelineMap[bucketKey].wifiSent += dws;
+      timelineMap[bucketKey].wifiReceived += dwr;
+      timelineMap[bucketKey].totalPings += 1;
+      if (isFailed) timelineMap[bucketKey].failedPings += 1;
+
+      const uId = ping.user_id;
+      if (uId) {
+        if (!userStats[uId]) {
+          userStats[uId] = {
+            user_id: uId,
+            first_name: ping.first_name || ping.telegram_user?.first_name || '',
+            last_name: ping.last_name || ping.telegram_user?.last_name || '',
+            phone_number: ping.phone_number || ping.telegram_user?.phone_number || '',
+            username: ping.username || ping.telegram_user?.username || '',
+            bytesSent: 0,
+            bytesReceived: 0,
+            mobileSent: 0,
+            mobileReceived: 0,
+            wifiSent: 0,
+            wifiReceived: 0,
+            totalPings: 0,
+            failedPings: 0
+          };
+        }
+        userStats[uId].bytesSent += ds;
+        userStats[uId].bytesReceived += dr;
+        userStats[uId].mobileSent += dms;
+        userStats[uId].mobileReceived += dmr;
+        userStats[uId].wifiSent += dws;
+        userStats[uId].wifiReceived += dwr;
+        userStats[uId].totalPings += 1;
+        if (isFailed) userStats[uId].failedPings += 1;
+      }
+
+      const proxyIp = ping.active_proxy_ip || 'Unknown';
+      if (!xrayStats[proxyIp]) {
+        xrayStats[proxyIp] = {
+          active_proxy_ip: proxyIp,
+          bytesSent: 0,
+          bytesReceived: 0,
+          mobileSent: 0,
+          mobileReceived: 0,
+          wifiSent: 0,
+          wifiReceived: 0,
+          totalPings: 0,
+          failedPings: 0
+        };
+      }
+      xrayStats[proxyIp].bytesSent += ds;
+      xrayStats[proxyIp].bytesReceived += dr;
+      xrayStats[proxyIp].mobileSent += dms;
+      xrayStats[proxyIp].mobileReceived += dmr;
+      xrayStats[proxyIp].wifiSent += dws;
+      xrayStats[proxyIp].wifiReceived += dwr;
+      xrayStats[proxyIp].totalPings += 1;
+      if (isFailed) xrayStats[proxyIp].failedPings += 1;
+    });
+
+    const aggregateTimeline = Object.values(timelineMap).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).map(bucket => {
+      const d = new Date(bucket.timestamp);
+      let timeLabel = "";
+      if (selectInterval === '5m' || selectInterval === '1h') {
+        timeLabel = d.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', hour12: false });
+      } else {
+        timeLabel = d.toLocaleDateString("en-US", { month: 'short', day: 'numeric' });
+      }
+      return { ...bucket, timeLabel };
+    });
+
+    const users = Object.values(userStats).sort((a, b) => (b.bytesSent + b.bytesReceived) - (a.bytesSent + a.bytesReceived));
+    const xrayIps = Object.values(xrayStats).sort((a, b) => (b.bytesSent + b.bytesReceived) - (a.bytesSent + a.bytesReceived));
+
+    res.json({
+      summary: {
+        totalBytesSent,
+        totalBytesReceived,
+        totalMobileSent,
+        totalMobileReceived,
+        totalWifiSent,
+        totalWifiReceived,
+        totalPings,
+        failedPings,
+        pingSuccessRate: totalPings ? parseFloat(((totalPings - failedPings) / totalPings * 100).toFixed(2)) : 100
+      },
+      aggregateTimeline,
+      users,
+      xrayIps
+    });
+  } catch (error) {
+    console.error('Traffic Report Endpoint Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 /**
  * GET /api/telemetry/xray-stats

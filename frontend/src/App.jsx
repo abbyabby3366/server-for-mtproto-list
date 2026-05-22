@@ -11,6 +11,7 @@ import NetworkUsage from './pages/NetworkUsage';
 import XrayStats from './pages/XrayStats';
 import Configs from './pages/Configs';
 import Users from './pages/Users';
+import TrafficReport from './pages/TrafficReport';
 
 // A wrapper component for protecting routes
 const ProtectedRoute = ({ children }) => {
@@ -69,6 +70,14 @@ function App() {
         element={
           <ProtectedRoute>
             <NetworkUsage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/traffic-report" 
+        element={
+          <ProtectedRoute>
+            <TrafficReport />
           </ProtectedRoute>
         } 
       />

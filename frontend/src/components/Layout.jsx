@@ -10,7 +10,8 @@ import {
   Sliders, 
   Users, 
   LogOut, 
-  Globe 
+  Globe,
+  TrendingUp
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -22,6 +23,7 @@ const Layout = ({ children }) => {
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/logins', label: 'Recent Logins', icon: LogIn },
     { path: '/network', label: 'Network Usage', icon: Activity },
+    { path: '/traffic-report', label: 'Traffic Report', icon: TrendingUp },
     { path: '/xray', label: 'Xray IP Stats', icon: Cpu },
     { path: '/configs', label: 'App Config', icon: Sliders },
   ];
