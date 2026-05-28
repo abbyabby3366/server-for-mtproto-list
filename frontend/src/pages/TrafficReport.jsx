@@ -212,43 +212,43 @@ const TrafficReport = () => {
         color: '#fff', 
         border: 'none',
         borderRadius: '12px',
-        padding: '12px 20px',
+        padding: '8px 16px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '16px',
-        marginBottom: '20px',
+        gap: '12px',
+        marginBottom: '16px',
         boxShadow: '0 4px 20px rgba(15, 23, 42, 0.15)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ 
-            width: '38px', 
-            height: '38px', 
-            borderRadius: '10px', 
+            width: '30px', 
+            height: '30px', 
+            borderRadius: '6px', 
             backgroundColor: 'rgba(249, 115, 22, 0.15)', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
             border: '1px solid rgba(249, 115, 22, 0.3)'
           }}>
-            <TrendingUp size={20} color="#f97316" />
+            <TrendingUp size={16} color="#f97316" />
           </div>
           <div>
-            <h2 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: 700 }}>
+            <h2 style={{ margin: 0, color: '#fff', fontSize: '15px', fontWeight: 700 }}>
               {t('Traffic Report')}
             </h2>
           </div>
         </div>
 
         {/* Global Action Filter Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {/* User selector */}
           <select 
             value={selectedUser}
             onChange={(e) => setSelectedUser(e.target.value)}
             className="form-control"
-            style={{ width: '160px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12.5px', borderRadius: '6px' }}
+            style={{ width: '150px', height: '28px', padding: '2px 8px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12px', borderRadius: '6px' }}
           >
             <option value="" style={{ backgroundColor: '#1e293b' }}>{t('All Users')}</option>
             {reportData?.users?.map(u => (
@@ -263,7 +263,7 @@ const TrafficReport = () => {
             value={selectedProxy}
             onChange={(e) => setSelectedProxy(e.target.value)}
             className="form-control"
-            style={{ width: '160px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12.5px', borderRadius: '6px' }}
+            style={{ width: '150px', height: '28px', padding: '2px 8px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12px', borderRadius: '6px' }}
           >
             <option value="" style={{ backgroundColor: '#1e293b' }}>{t('All Xray IPs')}</option>
             {reportData?.xrayIps?.map(x => (
@@ -281,7 +281,7 @@ const TrafficReport = () => {
               setInterval(''); // Reset manual interval override
             }}
             className="form-control"
-            style={{ width: '120px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12.5px', borderRadius: '6px' }}
+            style={{ width: '110px', height: '28px', padding: '2px 8px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12px', borderRadius: '6px' }}
           >
             <option value="last_15_mins" style={{ backgroundColor: '#1e293b' }}>{t('Last 15 Mins')}</option>
             <option value="last_hour" style={{ backgroundColor: '#1e293b' }}>{t('Last Hour')}</option>
@@ -296,7 +296,7 @@ const TrafficReport = () => {
             value={interval}
             onChange={(e) => setInterval(e.target.value)}
             className="form-control"
-            style={{ width: '90px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12.5px', borderRadius: '6px' }}
+            style={{ width: '85px', height: '28px', padding: '2px 8px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12px', borderRadius: '6px' }}
           >
             <option value="" style={{ backgroundColor: '#1e293b' }}>{t('Interval')}</option>
             <option value="5m" style={{ backgroundColor: '#1e293b' }}>5m</option>
@@ -306,17 +306,28 @@ const TrafficReport = () => {
 
           <button 
             className="btn btn-warning" 
-            style={{ padding: '8px 12px', background: '#f97316', border: 'none', color: '#fff', borderRadius: '6px' }} 
+            style={{ height: '28px', padding: '0 10px', background: '#f97316', border: 'none', color: '#fff', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
             onClick={() => fetchReport(false)}
             disabled={loading || indicatorLoading}
           >
-            <RefreshCw size={14} className={loading || indicatorLoading ? 'spin' : ''} />
+            <RefreshCw size={12} className={loading || indicatorLoading ? 'spin' : ''} />
           </button>
         </div>
       </div>
 
       {/* Tabs Menu Navigation Bar */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '20px', paddingBottom: '2px' }}>
+      <div style={{ 
+        display: 'flex', 
+        gap: '4px', 
+        borderBottom: '1px solid var(--border-color)', 
+        marginBottom: '20px', 
+        paddingBottom: '2px',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+        WebkitOverflowScrolling: 'touch',
+        msOverflowStyle: 'none',
+        scrollbarWidth: 'none'
+      }}>
         {[
           { id: 'overview', label: t('Overview Dashboard'), icon: Activity },
           { id: 'users', label: t('Users Breakdown'), icon: UsersIcon },
@@ -332,20 +343,22 @@ const TrafficReport = () => {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
+                gap: '6px',
+                padding: '10px 14px',
                 border: 'none',
                 borderBottom: isActive ? '3px solid #f97316' : '3px solid transparent',
                 background: 'none',
                 color: isActive ? '#0f172a' : '#64748b',
                 fontWeight: isActive ? 600 : 500,
-                fontSize: '13.5px',
+                fontSize: '13px',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                marginBottom: '-3px'
+                marginBottom: '-3px',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
               }}
             >
-              <Icon size={16} color={isActive ? '#f97316' : '#64748b'} />
+              <Icon size={15} color={isActive ? '#f97316' : '#64748b'} style={{ flexShrink: 0 }} />
               {tab.label}
             </button>
           );
@@ -1177,7 +1190,7 @@ const TrafficReport = () => {
           position: 'fixed',
           top: 0,
           right: 0,
-          width: '500px',
+          width: 'min(500px, 100vw)',
           height: '100vh',
           backgroundColor: '#fff',
           boxShadow: '-10px 0 30px rgba(15, 23, 42, 0.15)',
@@ -1400,7 +1413,7 @@ const TrafficReport = () => {
           position: 'fixed',
           top: 0,
           right: 0,
-          width: '500px',
+          width: 'min(500px, 100vw)',
           height: '100vh',
           backgroundColor: '#fff',
           boxShadow: '-10px 0 30px rgba(15, 23, 42, 0.15)',

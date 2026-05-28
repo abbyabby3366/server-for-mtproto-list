@@ -43,7 +43,9 @@ const Login = () => {
     }}>
       <div className="card" style={{
         width: '360px',
-        padding: '40px 30px',
+        maxWidth: 'calc(100% - 32px)',
+        boxSizing: 'border-box',
+        padding: '40px 24px',
         textAlign: 'center',
         boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
         border: 'none',

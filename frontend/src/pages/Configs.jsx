@@ -11,7 +11,9 @@ import {
   Edit3,
   CheckCircle,
   XCircle,
-  History
+  History,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const Configs = () => {
@@ -35,6 +37,7 @@ const Configs = () => {
   const [extConfigSaving, setExtConfigSaving] = useState(false);
   const [extNotification, setExtNotification] = useState(null);
   const [extResults, setExtResults] = useState(null);
+  const [extRedirectsOpen, setExtRedirectsOpen] = useState(false);
   const [domains, setDomains] = useState({
     'talkpro.cc': true,
     'talkspro.xyz': true,
@@ -47,6 +50,13 @@ const Configs = () => {
   const [transitSaving, setTransitSaving] = useState(false);
   const [transitNotification, setTransitNotification] = useState(null);
   const [transitLoading, setTransitLoading] = useState(true);
+
+  // ----- MT PROXIES STATE -----
+  const [proxies, setProxies] = useState([]);
+  const [proxiesRemarks, setProxiesRemarks] = useState('');
+  const [proxiesSaving, setProxiesSaving] = useState(false);
+  const [proxiesNotification, setProxiesNotification] = useState(null);
+  const [proxiesLoading, setProxiesLoading] = useState(true);
 
   // ----- LOGGING & TELEMETRY HISTORY STATE -----
   const [versionLogs, setVersionLogs] = useState([]);
@@ -138,9 +148,26 @@ const Configs = () => {
       }
     };
 
+    // 4. Fetch MT Proxies
+    const fetchProxies = async () => {
+      try {
+        const res = await authFetch('/api/proxies');
+        if (res.ok) {
+          const data = await res.json();
+          setProxies(data.proxies || []);
+          setProxiesRemarks(data.remarks || '');
+        }
+      } catch (err) {
+        console.error('Error fetching proxies:', err);
+      } finally {
+        setProxiesLoading(false);
+      }
+    };
+
     fetchVersion();
     fetchExternalConfig();
     fetchTransitIps();
+    fetchProxies();
     fetchVersionLogs();
     fetchRedirectLogs();
   }, [authFetch]);
@@ -302,20 +329,79 @@ const Configs = () => {
       if (res.ok) {
         showNotification(
           setTransitNotification,
-          `${t('Transit IPs & Remarks saved successfully!')} (${cleanIps.length} IP${cleanIps.length !== 1 ? 's' : ''})`,
+          `${t('XRAY IPs & Remarks saved successfully!')} (${cleanIps.length} IP${cleanIps.length !== 1 ? 's' : ''})`,
           'success'
         );
         // Refresh local array
         setTransitIps(cleanIps);
       } else {
-        showNotification(setTransitNotification, t('Failed to save transit IPs.'), 'error');
+        showNotification(setTransitNotification, t('Failed to save Xray IPs.'), 'error');
       }
     } catch (err) {
-      showNotification(setTransitNotification, t('Error saving transit IPs.'), 'error');
+      showNotification(setTransitNotification, t('Error saving Xray IPs.'), 'error');
     } finally {
       setTransitSaving(false);
     }
   };
+
+  // ----- MT PROXIES LIST OPERATIONS -----
+  const addProxyRow = () => {
+    setProxies((prev) => [...prev, { host: '', port: 443, secret: '' }]);
+  };
+
+  const removeProxyRow = (index) => {
+    setProxies((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleProxyChange = (index, field, value) => {
+    setProxies((prev) => {
+      const copy = [...prev];
+      copy[index] = { 
+        ...copy[index], 
+        [field]: field === 'port' ? (value === '' ? '' : parseInt(value, 10) || 0) : value 
+      };
+      return copy;
+    });
+  };
+
+  const handleProxiesSubmit = async () => {
+    setProxiesSaving(true);
+    setProxiesNotification(null);
+
+    // Clean up empty proxies (require host and secret to be present)
+    const cleanProxies = proxies
+      .map((p) => ({
+        host: p.host?.trim() || '',
+        port: parseInt(p.port, 10) || 443,
+        secret: p.secret?.trim() || ''
+      }))
+      .filter((p) => p.host.length > 0 && p.secret.length > 0);
+
+    try {
+      const res = await authFetch('/api/proxies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proxies: cleanProxies, remarks: proxiesRemarks })
+      });
+
+      if (res.ok) {
+        showNotification(
+          setProxiesNotification,
+          `${t('MT Proxies & Remarks saved successfully!')} (${cleanProxies.length} Prox${cleanProxies.length !== 1 ? 'ies' : 'y'})`,
+          'success'
+        );
+        setProxies(cleanProxies);
+      } else {
+        showNotification(setProxiesNotification, t('Failed to save MT Proxies.'), 'error');
+      }
+    } catch (err) {
+      showNotification(setProxiesNotification, t('Error saving MT Proxies.'), 'error');
+    } finally {
+      setProxiesSaving(false);
+    }
+  };
+
+
 
   // Helper notification timer
   const showNotification = (setter, message, type) => {
@@ -553,14 +639,53 @@ const Configs = () => {
       </div>
 
       {/* 2. EXTERNAL REDIRECTS CONFIG */}
-      <div className="card">
-        <h2 className="card-title">
-          <Globe size={20} color="#e67e22" />
-          {t('External Redirects')}
-        </h2>
-        <p className="card-subtitle">
-          {t('Update the APK download redirect link on external domains (e.g., talkpro.cc).')}
-        </p>
+      <div className="card" style={{ transition: 'all 0.3s ease' }}>
+        <div 
+          onClick={() => setExtRedirectsOpen(!extRedirectsOpen)}
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            cursor: 'pointer',
+            userSelect: 'none'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <h2 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Globe size={20} color="#e67e22" />
+              {t('External Redirects')}
+            </h2>
+            <span 
+              className="badge" 
+              style={{ 
+                backgroundColor: '#fee2e2', 
+                color: '#ef4444', 
+                fontSize: '11px', 
+                padding: '3px 8px', 
+                fontWeight: 600,
+                border: '1px solid #fecaca',
+                marginLeft: '6px'
+              }}
+            >
+              {t('Deprecated')}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+            {extRedirectsOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </div>
+        </div>
+        
+        {!extRedirectsOpen && (
+          <p className="card-subtitle" style={{ margin: '8px 0 0 0', fontStyle: 'italic', fontSize: '12px' }}>
+            {t('Click to expand this deprecated section.')}
+          </p>
+        )}
+
+        {extRedirectsOpen && (
+          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+            <p className="card-subtitle">
+              {t('Update the APK download redirect link on external domains (e.g., talkpro.cc).')}
+            </p>
 
         <form onSubmit={handleUpdateExternalRedirects}>
           <div className="form-group">
@@ -783,17 +908,16 @@ const Configs = () => {
             </div>
           )}
         </div>
+          </div>
+        )}
       </div>
 
-      {/* 3. TRANSIT NODE IPS */}
+      {/* 3. XRAY NODE IPS */}
       <div className="card">
         <h2 className="card-title">
           <Network size={20} color="#2ecc71" />
-          {t('Transit Node IPs')}
+          {t('XRAY Node IPs')}
         </h2>
-        <p className="card-subtitle">
-          {t('Manage the list of transit node IPs served at')} <code>/transit-ips</code>
-        </p>
 
         {transitLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
@@ -804,7 +928,7 @@ const Configs = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
               {transitIps.length === 0 ? (
                 <div style={{ color: '#64748b', fontStyle: 'italic', padding: '10px 0' }}>
-                  {t('No transit IPs configured. Click "+ Add IP Address" to get started.')}
+                  {t('No Xray IPs configured. Click "+ Add IP Address" to get started.')}
                 </div>
               ) : (
                 transitIps.map((ip, index) => (
@@ -869,7 +993,7 @@ const Configs = () => {
               disabled={transitSaving}
             >
               <Save size={16} />
-              {transitSaving ? t('Saving...') : t('Save Transit IPs & Remarks')}
+              {transitSaving ? t('Saving...') : t('Save XRAY IPs & Remarks')}
             </button>
           </div>
         )}
@@ -878,6 +1002,122 @@ const Configs = () => {
           <div className={`notification notification-${transitNotification.type}`}>
             {transitNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
             <span>{transitNotification.message}</span>
+          </div>
+        )}
+      </div>
+
+      {/* 4. MT PROXIES */}
+      <div className="card">
+        <h2 className="card-title">
+          <Network size={20} color="#9b59b6" />
+          {t('MT Proxies')}
+        </h2>
+
+        {proxiesLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+            <span className="spinner" style={{ borderTopColor: '#9b59b6' }}></span>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+              {proxies.length === 0 ? (
+                <div style={{ color: '#64748b', fontStyle: 'italic', padding: '10px 0' }}>
+                  {t('No MT Proxies configured. Click "+ Add Proxy" to get started.')}
+                </div>
+              ) : (
+                proxies.map((p, index) => (
+                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+                    <span style={{ fontWeight: 600, color: '#94a3b8', minWidth: '24px', textAlign: 'right' }}>
+                      {index + 1}.
+                    </span>
+                    
+                    <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={t('Host (e.g. 13.212.194.160)')}
+                        value={p.host || ''}
+                        onChange={(e) => handleProxyChange(index, 'host', e.target.value)}
+                        style={{ flex: '2 1 180px' }}
+                      />
+                      
+                      <input
+                        type="number"
+                        className="form-control"
+                        placeholder={t('Port (e.g. 443)')}
+                        value={p.port === '' ? '' : p.port}
+                        onChange={(e) => handleProxyChange(index, 'port', e.target.value)}
+                        style={{ flex: '1 1 80px', maxWidth: '100px' }}
+                      />
+                      
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder={t('Secret (hex)')}
+                        value={p.secret || ''}
+                        onChange={(e) => handleProxyChange(index, 'secret', e.target.value)}
+                        style={{ flex: '3 1 240px' }}
+                      />
+                    </div>
+
+                    <button 
+                      type="button" 
+                      onClick={() => removeProxyRow(index)} 
+                      className="btn btn-danger" 
+                      style={{ padding: '8px 12px' }}
+                      title={t('Remove')}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button 
+              type="button" 
+              onClick={addProxyRow} 
+              className="btn btn-success" 
+              style={{ marginBottom: '20px', backgroundColor: '#9b59b6' }}
+            >
+              <Plus size={16} />
+              {t('+ Add Proxy')}
+            </button>
+
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginTop: '20px' }}>
+              <label 
+                htmlFor="proxiesRemarks" 
+                style={{ fontWeight: 600, display: 'block', fontSize: '13px', marginBottom: '8px', color: 'var(--text-main)' }}
+              >
+                {t('Remarks / Scratchpad')}
+              </label>
+              <textarea
+                id="proxiesRemarks"
+                className="form-control"
+                placeholder={t('Paste notes, backup config strings, or scratchpad text here...')}
+                style={{ minHeight: '80px', resize: 'vertical' }}
+                value={proxiesRemarks}
+                onChange={(e) => setProxiesRemarks(e.target.value)}
+              />
+            </div>
+
+            <button 
+              type="button" 
+              onClick={handleProxiesSubmit} 
+              className="btn btn-primary" 
+              style={{ marginTop: '20px', backgroundColor: '#9b59b6' }}
+              disabled={proxiesSaving}
+            >
+              <Save size={16} />
+              {proxiesSaving ? t('Saving...') : t('Save MT Proxies & Remarks')}
+            </button>
+          </div>
+        )}
+
+        {proxiesNotification && (
+          <div className={`notification notification-${proxiesNotification.type}`}>
+            {proxiesNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+            <span>{proxiesNotification.message}</span>
           </div>
         )}
       </div>

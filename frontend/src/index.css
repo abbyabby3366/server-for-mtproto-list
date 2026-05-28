@@ -407,3 +407,140 @@ tr:hover td {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ==================================================== */
+/* RESPONSIVE LAYOUT AND MOBILE HEADER STYLING */
+/* ==================================================== */
+
+.mobile-header {
+  display: none;
+}
+
+.sidebar-close-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+    padding-top: 56px; /* Space for the sticky mobile top bar */
+  }
+
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 16px;
+    z-index: 990;
+    box-sizing: border-box;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .mobile-menu-toggle, .mobile-lang-toggle {
+    background: none;
+    border: none;
+    padding: 8px;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: background-color 0.2s, transform 0.1s ease;
+  }
+
+  .mobile-menu-toggle:active, .mobile-lang-toggle:active {
+    transform: scale(0.95);
+  }
+
+  .mobile-menu-toggle:hover, .mobile-lang-toggle:hover {
+    background-color: #f1f5f9;
+    color: var(--accent-color);
+  }
+
+  .mobile-header-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-header-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--primary-color);
+    letter-spacing: -0.02em;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1001;
+    width: var(--sidebar-width);
+    border-right: 1px solid var(--border-color);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.15);
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .sidebar-close-btn:hover {
+    background-color: #f1f5f9;
+    color: var(--danger-color);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .main-content {
+    padding: 12px;
+    min-height: calc(100vh - 56px);
+  }
+  
+  /* Make inline charts / tables inside forms behave better */
+  .form-group select.form-control {
+    width: 100% !important;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

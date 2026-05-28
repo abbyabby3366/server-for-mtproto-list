@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,13 +11,21 @@ import {
   Users, 
   LogOut, 
   Globe,
-  TrendingUp
+  TrendingUp,
+  Menu,
+  X
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
   const { lang, t, toggleLang } = useLanguage();
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Automatically close mobile sidebar on route changes
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
 
   const menuItems = [
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -35,14 +43,53 @@ const Layout = ({ children }) => {
 
   return (
     <div className="app-container">
+      {/* Mobile Top Header Navbar */}
+      <header className="mobile-header">
+        <button 
+          onClick={() => setIsSidebarOpen(true)} 
+          className="mobile-menu-toggle"
+          aria-label="Open menu"
+        >
+          <Menu size={22} />
+        </button>
+        <div className="mobile-header-logo">
+          <img src="/favicon.png" alt="Grapefruit" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
+          <span className="mobile-header-title">GrapeFruitTalk</span>
+        </div>
+        <button 
+          onClick={toggleLang} 
+          className="mobile-lang-toggle"
+          title="Change Language / 切換語言"
+        >
+          <Globe size={18} />
+        </button>
+      </header>
+
+      {/* Backdrop overlay for mobile drawer */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
-          <img src="/favicon.png" alt="Grapefruit" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
-          <div>
-            <h1 className="sidebar-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', lineHeight: '1.2' }}>GrapeFruitTalk</h1>
-            <span style={{ fontSize: '10px', color: '#ea580c', fontWeight: 700, letterSpacing: '0.05em' }}>TELEMETRY HUB</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+            <img src="/favicon.png" alt="Grapefruit" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+            <div>
+              <h1 className="sidebar-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', lineHeight: '1.2' }}>GrapeFruitTalk</h1>
+              <span style={{ fontSize: '10px', color: '#ea580c', fontWeight: 700, letterSpacing: '0.05em' }}>TELEMETRY HUB</span>
+            </div>
           </div>
+          <button 
+            onClick={() => setIsSidebarOpen(false)} 
+            className="sidebar-close-btn"
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="sidebar-menu">

@@ -96,6 +96,19 @@ const transitIpsSchema = new mongoose.Schema({
 });
 const TransitIps = mongoose.model('TransitIps', transitIpsSchema);
 
+const mtProxyConfigSchema = new mongoose.Schema({
+  proxies: [
+    {
+      host: String,
+      port: Number,
+      secret: String,
+      disabled: Boolean
+    }
+  ],
+  remarks: String
+});
+const MtProxyConfig = mongoose.model('MtProxyConfig', mtProxyConfigSchema);
+
 const externalRedirectConfigSchema = new mongoose.Schema({
   token: String,
   downloadUrl: String
@@ -121,6 +134,39 @@ mongoose.connection.once('open', async () => {
     }
   } catch (err) {
     console.error('Error initializing default admin:', err);
+  }
+});
+
+// Initialize default proxies if collection is empty
+mongoose.connection.once('open', async () => {
+  try {
+    const count = await MtProxyConfig.countDocuments();
+    if (count === 0) {
+      let initialProxies = [];
+      const proxiesPath = path.join(__dirname, 'proxies.json');
+      if (fs.existsSync(proxiesPath)) {
+        const proxiesData = fs.readFileSync(proxiesPath, 'utf-8');
+        try {
+          initialProxies = JSON.parse(proxiesData);
+        } catch (e) {
+          console.error('Error parsing initial proxies.json:', e.message);
+        }
+      }
+      
+      let initialRemarks = '';
+      const remarksPath = path.join(__dirname, 'proxies-remarks.txt');
+      if (fs.existsSync(remarksPath)) {
+        initialRemarks = fs.readFileSync(remarksPath, 'utf-8');
+      }
+
+      await MtProxyConfig.create({
+        proxies: initialProxies,
+        remarks: initialRemarks
+      });
+      console.log('Seeded MtProxyConfig from proxies.json');
+    }
+  } catch (err) {
+    console.error('Error seeding MtProxyConfig:', err);
   }
 });
 
@@ -182,18 +228,21 @@ const apiKeyAuth = (req, res, next) => {
  *   }
  * ]
  */
-app.get('/proxies', apiKeyAuth, (req, res) => {
+app.get('/proxies', apiKeyAuth, async (req, res) => {
   try {
-    const proxiesPath = path.join(__dirname, 'proxies.json');
-    const proxiesData = fs.readFileSync(proxiesPath, 'utf-8');
-    const proxies = JSON.parse(proxiesData);
+    const config = await MtProxyConfig.findOne();
+    const proxies = config ? config.proxies : [];
 
     // Filter out any proxies marked as disabled
-    const activeProxies = proxies.filter(p => p.disabled !== true);
+    const activeProxies = proxies.filter(p => p.disabled !== true).map(p => ({
+      host: p.host,
+      port: p.port,
+      secret: p.secret
+    }));
 
     res.json(activeProxies);
   } catch (error) {
-    console.error('Error reading proxies:', error.message);
+    console.error('Error reading proxies from DB:', error.message);
     res.status(500).json({ error: 'Failed to load proxy list' });
   }
 });
@@ -219,10 +268,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     const jwtSecret = process.env.JWT_SECRET || 'default_jwt_secret_change_me_in_env';
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '30d';
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       jwtSecret,
-      { expiresIn: '72h' }
+      { expiresIn: jwtExpiresIn }
     );
     res.json({ token, user: { username: user.username, role: user.role } });
   } catch (error) {
@@ -357,6 +407,59 @@ app.post('/api/transit-ips', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error updating transit IPs:', error.message);
     res.status(500).json({ error: 'Failed to update transit IPs' });
+  }
+});
+
+// --- Proxy Management Endpoints for UI ---
+/**
+ * GET /api/proxies
+ * Returns the proxy list and remarks for the UI.
+ */
+app.get('/api/proxies', verifyToken, async (req, res) => {
+  try {
+    const config = await MtProxyConfig.findOne();
+    res.json({
+      proxies: config ? config.proxies : [],
+      remarks: config ? config.remarks || '' : ''
+    });
+  } catch (error) {
+    console.error('Error reading proxies for UI:', error.message);
+    res.status(500).json({ error: 'Failed to load proxies' });
+  }
+});
+
+/**
+ * POST /api/proxies
+ * Updates the proxies and remarks in MongoDB.
+ */
+app.post('/api/proxies', verifyToken, async (req, res) => {
+  try {
+    const { proxies, remarks } = req.body;
+    if (!Array.isArray(proxies)) {
+      return res.status(400).json({ error: 'proxies must be an array' });
+    }
+    
+    // Validate required fields
+    for (const p of proxies) {
+      if (!p.host || !p.port || !p.secret) {
+        return res.status(400).json({ error: 'Each proxy must have host, port, and secret fields' });
+      }
+    }
+    
+    let config = await MtProxyConfig.findOne();
+    if (config) {
+      config.proxies = proxies;
+      if (remarks !== undefined) config.remarks = remarks;
+      await config.save();
+    } else {
+      config = new MtProxyConfig({ proxies, remarks: remarks || '' });
+      await config.save();
+    }
+    
+    res.json({ status: 'updated', count: proxies.length });
+  } catch (error) {
+    console.error('Error saving proxies from UI:', error.message);
+    res.status(500).json({ error: 'Failed to update proxies' });
   }
 });
 
@@ -588,7 +691,7 @@ app.post('/api/external-redirect-config', verifyToken, async (req, res) => {
  * Admin endpoint to update the proxy list.
  * Requires API_KEY to be set.
  */
-app.post('/proxies', apiKeyAuth, (req, res) => {
+app.post('/proxies', apiKeyAuth, async (req, res) => {
   try {
     const proxies = req.body;
     if (!Array.isArray(proxies)) {
@@ -605,12 +708,18 @@ app.post('/proxies', apiKeyAuth, (req, res) => {
       }
     }
 
-    const proxiesPath = path.join(__dirname, 'proxies.json');
-    fs.writeFileSync(proxiesPath, JSON.stringify(proxies, null, 2));
+    let config = await MtProxyConfig.findOne();
+    if (config) {
+      config.proxies = proxies;
+      await config.save();
+    } else {
+      config = new MtProxyConfig({ proxies, remarks: '' });
+      await config.save();
+    }
 
     res.json({ status: 'updated', count: proxies.length });
   } catch (error) {
-    console.error('Error updating proxies:', error.message);
+    console.error('Error updating proxies in DB:', error.message);
     res.status(500).json({ error: 'Failed to update proxy list' });
   }
 });
