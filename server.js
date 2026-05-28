@@ -1330,34 +1330,67 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     let dailyActiveUsers = 0;
     let dailyActiveUsersTotal = 0;
     let dailyActiveUsersForeground = 0;
+    let dailyActiveUsersBackground = 0;
+    let dailyActiveUsersNotApplicable = 0;
     let dailyNewUsers = 0;
 
+    let activeUsersStats;
     if (timeframe === 'all_time') {
-      const allUsers = await NetworkTelemetry.distinct("user_id");
-      dailyActiveUsersTotal = allUsers.length;
-      
-      const fgUsers = await NetworkTelemetry.distinct("user_id", {
-        $or: [
-          { delta_sent: { $gt: 0 } },
-          { delta_received: { $gt: 0 } }
-        ]
-      });
-      dailyActiveUsersForeground = fgUsers.length;
+      activeUsersStats = await NetworkTelemetry.aggregate([
+        { $group: {
+            _id: "$user_id",
+            records: { $push: {
+              is_foreground: "$is_foreground",
+              isForeground: "$isForeground",
+              device_info: "$device_info"
+            }}
+        }}
+      ]);
     } else {
-      const activeRaw = await NetworkTelemetry.distinct("user_id", query);
-      dailyActiveUsersTotal = activeRaw.length;
-
-      const fgQuery = {
-        ...query,
-        $or: [
-          { delta_sent: { $gt: 0 } },
-          { delta_received: { $gt: 0 } }
-        ]
-      };
-      const fgRaw = await NetworkTelemetry.distinct("user_id", fgQuery);
-      dailyActiveUsersForeground = fgRaw.length;
+      activeUsersStats = await NetworkTelemetry.aggregate([
+        { $match: query },
+        { $group: {
+            _id: "$user_id",
+            records: { $push: {
+              is_foreground: "$is_foreground",
+              isForeground: "$isForeground",
+              device_info: "$device_info"
+            }}
+        }}
+      ]);
     }
-    
+
+    activeUsersStats.forEach(u => {
+      let hasF = false;
+      let hasB = false;
+
+      (u.records || []).forEach(r => {
+        let val = undefined;
+        if (r.device_info && r.device_info.is_in_foreground !== undefined) {
+          val = r.device_info.is_in_foreground;
+        } else if (r.is_foreground !== undefined) {
+          val = r.is_foreground;
+        } else if (r.isForeground !== undefined) {
+          val = r.isForeground;
+        }
+
+        if (val === true) {
+          hasF = true;
+        } else if (val === false) {
+          hasB = true;
+        }
+      });
+
+      if (hasF) {
+        dailyActiveUsersForeground++;
+      } else if (hasB) {
+        dailyActiveUsersBackground++;
+      } else {
+        dailyActiveUsersNotApplicable++;
+      }
+    });
+
+    dailyActiveUsersTotal = activeUsersStats.length;
     // Retain dailyActiveUsers for backward compatibility and averages
     dailyActiveUsers = dailyActiveUsersTotal;
 
@@ -1458,6 +1491,8 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     res.json({
       dailyActiveUsers,
       dailyActiveUsersForeground,
+      dailyActiveUsersBackground,
+      dailyActiveUsersNotApplicable,
       dailyActiveUsersTotal,
       dailyNewUsers,
       totalUsers,

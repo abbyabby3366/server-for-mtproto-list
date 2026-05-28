@@ -83,7 +83,7 @@ const TrafficReport = () => {
     }
 
     try {
-      let queryStr = `/api/telemetry/traffic-report?timeframe=${timeframe}`;
+      let queryStr = `/api/telemetry/traffic-report?timeframe=${timeframe}&t=${Date.now()}`;
       if (interval) queryStr += `&interval=${interval}`;
       if (selectedUser) queryStr += `&user_id=${selectedUser}`;
       if (selectedProxy) queryStr += `&active_proxy_ip=${encodeURIComponent(selectedProxy)}`;
@@ -121,7 +121,7 @@ const TrafficReport = () => {
     setUserDrawerData(null);
     try {
       // Fetch report data filtered to this user only (with timeframe and auto buckets)
-      const res = await authFetch(`/api/telemetry/traffic-report?timeframe=${timeframe}&user_id=${userId}`);
+      const res = await authFetch(`/api/telemetry/traffic-report?timeframe=${timeframe}&user_id=${userId}&t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setUserDrawerData(data);
@@ -140,7 +140,7 @@ const TrafficReport = () => {
     setProxyDrawerData(null);
     try {
       // Fetch report data filtered to this proxy IP only (with timeframe and auto buckets)
-      const res = await authFetch(`/api/telemetry/traffic-report?timeframe=${timeframe}&active_proxy_ip=${encodeURIComponent(ip)}`);
+      const res = await authFetch(`/api/telemetry/traffic-report?timeframe=${timeframe}&active_proxy_ip=${encodeURIComponent(ip)}&t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setProxyDrawerData(data);

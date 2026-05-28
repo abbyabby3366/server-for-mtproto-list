@@ -21,7 +21,7 @@ const Analytics = () => {
   const loadData = useCallback(async (showLoadingSpinner = false) => {
     if (showLoadingSpinner) setLoading(true);
     try {
-      const res = await authFetch(`/api/telemetry/daily-stats?timeframe=${timeframe}`);
+      const res = await authFetch(`/api/telemetry/daily-stats?timeframe=${timeframe}&t=${Date.now()}`);
       if (res.ok) {
         const result = await res.json();
         setData(result);
@@ -90,7 +90,7 @@ const Analytics = () => {
           </div>
         </div>
         
-        {loading && !data ? (
+        {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
             <span className="spinner" style={{ borderTopColor: '#3498db', width: '32px', height: '32px' }}></span>
             <span style={{ marginTop: '16px', color: '#64748b', fontWeight: 500 }}>{t('Loading...')}</span>
@@ -98,7 +98,7 @@ const Analytics = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {/* Row 1: User count period statistics */}
-            <div className="grid grid-cols-3" style={{ gap: '12px' }}>
+            <div className="grid grid-cols-4" style={{ gap: '12px' }}>
               <div className="card" style={{ borderLeft: '4px solid #2ecc71', margin: 0, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
@@ -106,28 +106,42 @@ const Analytics = () => {
                       {data?.dailyActiveUsersForeground ?? 0}
                     </div>
                     <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                      {t('Active Users (Foreground Only)')}
+                      {t('Foreground only')}
                     </div>
                   </div>
                   <Users size={16} color="#2ecc71" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #2ecc71', margin: 0, padding: '12px 14px' }}>
+              <div className="card" style={{ borderLeft: '4px solid #3498db', margin: 0, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
-                      {data?.dailyActiveUsersTotal ?? 0}
+                      {data?.dailyActiveUsersBackground ?? 0}
                     </div>
                     <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                      {t('Active Users (Foreground + Background)')}
+                      {t('Background only')}
                     </div>
                   </div>
-                  <Users size={16} color="#2ecc71" />
+                  <Users size={16} color="#3498db" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #2ecc71', margin: 0, padding: '12px 14px' }}>
+              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
+                      {data?.dailyActiveUsersNotApplicable ?? 0}
+                    </div>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
+                      {t('Non-applicable')}
+                    </div>
+                  </div>
+                  <Users size={16} color="#f39c12" />
+                </div>
+              </div>
+
+              <div className="card" style={{ borderLeft: '4px solid #95a5a6', margin: 0, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
@@ -137,7 +151,7 @@ const Analytics = () => {
                       {t('New Users (Period)')}
                     </div>
                   </div>
-                  <Users size={16} color="#2ecc71" />
+                  <Users size={16} color="#95a5a6" />
                 </div>
               </div>
             </div>
@@ -213,7 +227,7 @@ const Analytics = () => {
               </tr>
             </thead>
             <tbody>
-              {loading && !data ? (
+              {loading ? (
                 <tr>
                   <td colSpan="3" style={{ textAlign: 'center', padding: '24px' }}>
                     <span className="spinner" style={{ borderTopColor: '#3498db', width: '20px', height: '20px' }}></span>

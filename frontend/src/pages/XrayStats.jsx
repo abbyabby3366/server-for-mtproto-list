@@ -33,7 +33,7 @@ const XrayStats = () => {
 
     try {
       const res = await authFetch(
-        `/api/telemetry/xray-stats?timeframe=${timeFilter}&latestPing=${pingFilter}`
+        `/api/telemetry/xray-stats?timeframe=${timeFilter}&latestPing=${pingFilter}&t=${Date.now()}`
       );
       if (res.ok) {
         const data = await res.json();

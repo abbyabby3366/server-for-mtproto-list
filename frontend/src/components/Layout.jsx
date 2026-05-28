@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  BarChart3, 
-  LogIn, 
-  Activity, 
-  Cpu, 
-  Sliders, 
-  Users, 
-  LogOut, 
+import {
+  BarChart3,
+  LogIn,
+  Activity,
+  Cpu,
+  Sliders,
+  Users,
+  LogOut,
   Globe,
   TrendingUp,
   Menu,
@@ -45,8 +45,8 @@ const Layout = ({ children }) => {
     <div className="app-container">
       {/* Mobile Top Header Navbar */}
       <header className="mobile-header">
-        <button 
-          onClick={() => setIsSidebarOpen(true)} 
+        <button
+          onClick={() => setIsSidebarOpen(true)}
           className="mobile-menu-toggle"
           aria-label="Open menu"
         >
@@ -56,8 +56,8 @@ const Layout = ({ children }) => {
           <img src="/favicon.png" alt="Grapefruit" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
           <span className="mobile-header-title">GrapeFruitTalk</span>
         </div>
-        <button 
-          onClick={toggleLang} 
+        <button
+          onClick={toggleLang}
           className="mobile-lang-toggle"
           title="Change Language / 切換語言"
         >
@@ -67,8 +67,8 @@ const Layout = ({ children }) => {
 
       {/* Backdrop overlay for mobile drawer */}
       {isSidebarOpen && (
-        <div 
-          className="sidebar-overlay" 
+        <div
+          className="sidebar-overlay"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -79,12 +79,12 @@ const Layout = ({ children }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
             <img src="/favicon.png" alt="Grapefruit" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             <div>
-              <h1 className="sidebar-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', lineHeight: '1.2' }}>GrapeFruitTalk</h1>
+              <h1 className="sidebar-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', lineHeight: '1.2' }}>GrapeFruitTalk v1.1</h1>
               <span style={{ fontSize: '10px', color: '#ea580c', fontWeight: 700, letterSpacing: '0.05em' }}>TELEMETRY HUB</span>
             </div>
           </div>
-          <button 
-            onClick={() => setIsSidebarOpen(false)} 
+          <button
+            onClick={() => setIsSidebarOpen(false)}
             className="sidebar-close-btn"
             aria-label="Close menu"
           >
@@ -126,9 +126,9 @@ const Layout = ({ children }) => {
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
             {/* Language Selection */}
-            <button 
-              onClick={toggleLang} 
-              className="btn btn-warning" 
+            <button
+              onClick={toggleLang}
+              className="btn btn-warning"
               style={{ flex: 1, padding: '8px 10px', fontSize: '12px', background: '#fff7ed', border: '1px solid #fed7aa', color: '#ea580c' }}
               title="Change Language / 切換語言"
             >
@@ -137,9 +137,9 @@ const Layout = ({ children }) => {
             </button>
 
             {/* Logout Button */}
-            <button 
-              onClick={logout} 
-              className="btn btn-danger" 
+            <button
+              onClick={logout}
+              className="btn btn-danger"
               style={{ flex: 1, padding: '8px 10px', fontSize: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}
             >
               <LogOut size={14} />
