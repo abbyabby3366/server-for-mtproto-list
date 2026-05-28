@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { BarChart3, Users, Download, Upload, Clock } from 'lucide-react';
+import { BarChart3, Users, Download, Upload, Clock, Info } from 'lucide-react';
 
 export const formatBytes = (bytes) => {
   if (bytes === 0 || !bytes) return '0 B';
@@ -106,7 +106,7 @@ const Analytics = () => {
                       {data?.dailyActiveUsersForeground ?? 0}
                     </div>
                     <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                      {t('Foreground only')}
+                      {t('Users with at least one foreground ping')}
                     </div>
                   </div>
                   <Users size={16} color="#2ecc71" />
@@ -120,7 +120,7 @@ const Analytics = () => {
                       {data?.dailyActiveUsersBackground ?? 0}
                     </div>
                     <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                      {t('Background only')}
+                      {t('Users with strictly background pings only')}
                     </div>
                   </div>
                   <Users size={16} color="#3498db" />
@@ -134,7 +134,7 @@ const Analytics = () => {
                       {data?.dailyActiveUsersNotApplicable ?? 0}
                     </div>
                     <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                      {t('Non-applicable')}
+                      {t('Users using legacy app clients')}
                     </div>
                   </div>
                   <Users size={16} color="#f39c12" />
@@ -206,10 +206,13 @@ const Analytics = () => {
       </div>
 
       <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-          <h2 className="card-title" style={{ margin: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <h2 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Clock size={20} color="#3498db" />
-            {t('Top 20 Users by Traffic')}
+            <span>{t('Top 20 Users by Traffic')}</span>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
+              ({t('Includes VPN/Proxy')})
+            </span>
           </h2>
           <span className="badge badge-info" style={{ padding: '6px 12px', fontSize: '12px' }}>
             {getTimeRangeText()}

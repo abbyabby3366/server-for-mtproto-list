@@ -820,8 +820,19 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
     const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(5000);
     const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).limit(5000).lean();
     
-    // Attach phone number from latest login to network data
-    const network = await Promise.all(networkRaw.map(async (net) => {
+    // Batch lookup latest logins for the network raw user IDs to avoid N+1 queries
+    const userIds = [...new Set(networkRaw.map(net => net.user_id).filter(Boolean))];
+    const loginLookup = {};
+    if (userIds.length > 0) {
+      const loginsData = await LoginTelemetry.aggregate([
+        { $match: { 'telegram_user.user_id': { $in: userIds } } },
+        { $sort: { timestamp: -1 } },
+        { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+      ]);
+      loginsData.forEach(l => { loginLookup[l._id] = l.doc; });
+    }
+
+    const network = networkRaw.map((net) => {
       let phone = net.telegram_user?.phone_number;
       let fName = net.telegram_user?.first_name;
       let lName = net.telegram_user?.last_name;
@@ -829,10 +840,10 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
       
       // We only fallback name/phone to LoginTelemetry, NOT the proxy IP.
       if (!phone && phone !== "") {
-        const userLogin = await LoginTelemetry.findOne({ "telegram_user.user_id": net.user_id }).sort({ timestamp: -1 }).lean();
-        phone = phone || userLogin?.telegram_user?.phone_number || "";
-        fName = fName || userLogin?.telegram_user?.first_name || "Unknown";
-        lName = lName || userLogin?.telegram_user?.last_name || "";
+        const userLogin = loginLookup[net.user_id] || {};
+        phone = phone || userLogin?.phone_number || "";
+        fName = fName || userLogin?.first_name || "Unknown";
+        lName = lName || userLogin?.last_name || "";
       }
       
       return {
@@ -842,7 +853,7 @@ app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
         first_name: fName || "Unknown",
         last_name: lName || ""
       };
-    }));
+    });
     
     const uniqueUsersCount = await NetworkTelemetry.distinct('user_id');
     const totalUniqueUsers = uniqueUsersCount.filter(Boolean).length;
@@ -1264,18 +1275,30 @@ app.get('/api/telemetry/all-buckets', verifyToken, async (req, res) => {
   try {
     const buckets = await NetworkDailyBucket.find().sort({ date: -1, last_updated: -1 }).limit(1000).lean();
     
-    const populated = await Promise.all(buckets.map(async (b) => {
+    // Batch lookup latest logins for the bucket user IDs to avoid N+1 queries
+    const userIds = [...new Set(buckets.map(b => b.user_id).filter(Boolean))];
+    const loginLookup = {};
+    if (userIds.length > 0) {
+      const loginsData = await LoginTelemetry.aggregate([
+        { $match: { 'telegram_user.user_id': { $in: userIds } } },
+        { $sort: { timestamp: -1 } },
+        { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+      ]);
+      loginsData.forEach(l => { loginLookup[l._id] = l.doc; });
+    }
+
+    const populated = buckets.map((b) => {
        let phone = b.telegram_user?.phone_number;
        
        if (!phone) {
-          const userLogin = await LoginTelemetry.findOne({ "telegram_user.user_id": b.user_id }).sort({ timestamp: -1 }).lean();
+          const userLogin = loginLookup[b.user_id] || {};
           b.telegram_user = b.telegram_user || {};
-          b.telegram_user.phone_number = userLogin?.telegram_user?.phone_number || "";
-          b.telegram_user.first_name = userLogin?.telegram_user?.first_name || "Unknown";
-          b.telegram_user.last_name = userLogin?.telegram_user?.last_name || "";
+          b.telegram_user.phone_number = userLogin?.phone_number || "";
+          b.telegram_user.first_name = userLogin?.first_name || "Unknown";
+          b.telegram_user.last_name = userLogin?.last_name || "";
        }
        return b;
-    }));
+    });
     
     res.json(populated);
   } catch (error) {
@@ -1339,51 +1362,65 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
       activeUsersStats = await NetworkTelemetry.aggregate([
         { $group: {
             _id: "$user_id",
-            records: { $push: {
-              is_foreground: "$is_foreground",
-              isForeground: "$isForeground",
-              device_info: "$device_info"
-            }}
+            hasForeground: { $max: {
+              $cond: [
+                { $or: [
+                  { $eq: ["$device_info.is_in_foreground", true] },
+                  { $eq: ["$is_foreground", true] },
+                  { $eq: ["$isForeground", true] }
+                ] },
+                true,
+                false
+              ]
+            } },
+            hasBackground: { $max: {
+              $cond: [
+                { $or: [
+                  { $eq: ["$device_info.is_in_foreground", false] },
+                  { $eq: ["$is_foreground", false] },
+                  { $eq: ["$isForeground", false] }
+                ] },
+                true,
+                false
+              ]
+            } }
         }}
-      ]);
+      ]).allowDiskUse(true);
     } else {
       activeUsersStats = await NetworkTelemetry.aggregate([
         { $match: query },
         { $group: {
             _id: "$user_id",
-            records: { $push: {
-              is_foreground: "$is_foreground",
-              isForeground: "$isForeground",
-              device_info: "$device_info"
-            }}
+            hasForeground: { $max: {
+              $cond: [
+                { $or: [
+                  { $eq: ["$device_info.is_in_foreground", true] },
+                  { $eq: ["$is_foreground", true] },
+                  { $eq: ["$isForeground", true] }
+                ] },
+                true,
+                false
+              ]
+            } },
+            hasBackground: { $max: {
+              $cond: [
+                { $or: [
+                  { $eq: ["$device_info.is_in_foreground", false] },
+                  { $eq: ["$is_foreground", false] },
+                  { $eq: ["$isForeground", false] }
+                ] },
+                true,
+                false
+              ]
+            } }
         }}
-      ]);
+      ]).allowDiskUse(true);
     }
 
     activeUsersStats.forEach(u => {
-      let hasF = false;
-      let hasB = false;
-
-      (u.records || []).forEach(r => {
-        let val = undefined;
-        if (r.device_info && r.device_info.is_in_foreground !== undefined) {
-          val = r.device_info.is_in_foreground;
-        } else if (r.is_foreground !== undefined) {
-          val = r.is_foreground;
-        } else if (r.isForeground !== undefined) {
-          val = r.isForeground;
-        }
-
-        if (val === true) {
-          hasF = true;
-        } else if (val === false) {
-          hasB = true;
-        }
-      });
-
-      if (hasF) {
+      if (u.hasForeground === true) {
         dailyActiveUsersForeground++;
-      } else if (hasB) {
+      } else if (u.hasBackground === true) {
         dailyActiveUsersBackground++;
       } else {
         dailyActiveUsersNotApplicable++;
@@ -1397,50 +1434,66 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     const totalUsersRaw = await NetworkTelemetry.distinct("user_id");
     const totalUsers = totalUsersRaw.length;
 
-    const firstPings = await NetworkTelemetry.aggregate([
-      { $group: { _id: "$user_id", first_ping: { $min: "$last_updated" } } }
-    ]);
-    
+    // OPTIMIZED: Eliminate heavy aggregation of the entire collection to find first pings for all users
     if (timeframe === 'all_time') {
       dailyNewUsers = totalUsers;
     } else {
-      dailyNewUsers = firstPings.filter(u => u.first_ping && u.first_ping >= startTime && u.first_ping < endTime).length;
+      // Find all active user IDs in the timeframe, then check which ones had NO pings before the timeframe start.
+      const activeUserIds = activeUsersStats.map(u => u._id).filter(Boolean);
+      const existingUserIds = await NetworkTelemetry.distinct("user_id", {
+        user_id: { $in: activeUserIds },
+        last_updated: { $lt: startTime }
+      });
+      dailyNewUsers = activeUserIds.length - existingUserIds.length;
     }
 
-    const statsRaw = await NetworkTelemetry.aggregate([
-      { $group: {
-          _id: "$user_id",
-          total_sent: { $sum: "$delta_sent" },
-          total_received: { $sum: "$delta_received" },
-          telegram_user: { $first: "$telegram_user" }
-      }}
-    ]);
-
+    // OPTIMIZED: If timeframe !== 'all_time', we only need the overall total sum of sent/received bytes.
+    // We only perform the heavy group-by-user aggregation for all_time queries.
+    let periodStatsRaw;
     let sumTotalSent = 0;
     let sumTotalReceived = 0;
     const userTrafficMap = {};
 
-    statsRaw.forEach(userStat => {
-      const sent = userStat.total_sent || 0;
-      const recv = userStat.total_received || 0;
-      sumTotalSent += sent;
-      sumTotalReceived += recv;
-      
-      userTrafficMap[userStat._id] = {
-        user_id: userStat._id,
-        telegram_user: userStat.telegram_user,
-        total_traffic: sent + recv
-      };
-    });
-
-    let periodStatsRaw;
     if (timeframe === 'all_time') {
+      const statsRaw = await NetworkTelemetry.aggregate([
+        { $group: {
+            _id: "$user_id",
+            total_sent: { $sum: "$delta_sent" },
+            total_received: { $sum: "$delta_received" },
+            telegram_user: { $first: "$telegram_user" }
+        }}
+      ]).allowDiskUse(true);
+      statsRaw.forEach(userStat => {
+        const sent = userStat.total_sent || 0;
+        const recv = userStat.total_received || 0;
+        sumTotalSent += sent;
+        sumTotalReceived += recv;
+        
+        userTrafficMap[userStat._id] = {
+          user_id: userStat._id,
+          telegram_user: userStat.telegram_user,
+          total_traffic: sent + recv
+        };
+      });
+
       periodStatsRaw = statsRaw.map(s => ({
           _id: s._id,
           today_sent: s.total_sent,
           today_received: s.total_received
       }));
     } else {
+      const totalStats = await NetworkTelemetry.aggregate([
+        { $group: {
+            _id: null,
+            total_sent: { $sum: "$delta_sent" },
+            total_received: { $sum: "$delta_received" }
+        }}
+      ]).allowDiskUse(true);
+      if (totalStats.length > 0) {
+        sumTotalSent = totalStats[0].total_sent || 0;
+        sumTotalReceived = totalStats[0].total_received || 0;
+      }
+
       periodStatsRaw = await NetworkTelemetry.aggregate([
         { $match: query },
         { $group: {
@@ -1449,7 +1502,7 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
             today_received: { $sum: "$delta_received" },
             telegram_user: { $first: "$telegram_user" }
         }}
-      ]);
+      ]).allowDiskUse(true);
     }
 
     let sumDailySent = 0;
@@ -1478,8 +1531,18 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
 
     let topUsers = periodUserTraffic.sort((a, b) => b.total_traffic - a.total_traffic).slice(0, 20);
     
+    // OPTIMIZED: Query first pings ONLY for the top 20 users
+    const topUserIds = topUsers.map(tu => tu.user_id).filter(Boolean);
+    let topUsersFirstPings = [];
+    if (topUserIds.length > 0) {
+      topUsersFirstPings = await NetworkTelemetry.aggregate([
+        { $match: { user_id: { $in: topUserIds } } },
+        { $group: { _id: "$user_id", first_ping: { $min: "$last_updated" } } }
+      ]).allowDiskUse(true);
+    }
+
     topUsers = topUsers.map(tu => {
-       const userFirstPing = firstPings.find(fp => fp._id === tu.user_id);
+       const userFirstPing = topUsersFirstPings.find(fp => fp._id === tu.user_id);
        let usageDays = 0;
        if (userFirstPing && userFirstPing.first_ping) {
            const diffTime = Math.abs(new Date() - new Date(userFirstPing.first_ping));
@@ -1560,7 +1623,11 @@ app.get('/api/telemetry/traffic-report', verifyToken, async (req, res) => {
       }
     }
 
-    const pings = await NetworkTelemetry.find(query).sort({ last_updated: 1 }).lean();
+    let pings = await NetworkTelemetry.find(query)
+      .sort({ last_updated: -1 })
+      .limit(25000)
+      .lean();
+    pings.reverse(); // Restore chronological order for bucketing
 
     let totalBytesSent = 0;
     let totalBytesReceived = 0;
@@ -1785,6 +1852,7 @@ app.get('/api/telemetry/xray-stats', verifyToken, async (req, res) => {
       pipeline = [
         { $match: query },
         { $sort: { last_updated: -1 } },
+        { $limit: 15000 }, // OPTIMIZED: Scan only latest 15,000 records using index, avoiding massive table sorts
         { $group: {
             _id: "$user_id",
             doc: { $first: "$$ROOT" }
@@ -1828,7 +1896,7 @@ app.get('/api/telemetry/xray-stats', verifyToken, async (req, res) => {
         }}
       ];
     }
-    const statsRaw = await NetworkTelemetry.aggregate(pipeline);
+    const statsRaw = await NetworkTelemetry.aggregate(pipeline).allowDiskUse(true);
 
     const results = statsRaw.map(st => {
       const uniqueUsersMap = {};

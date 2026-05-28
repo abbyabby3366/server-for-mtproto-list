@@ -392,20 +392,63 @@ tr:hover td {
   }
 }
 
-/* Loading Spinners */
+/* Loading Spinners - 3 Bouncing Dots Loader */
 .spinner {
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top: 2px solid #ffffff;
-  width: 16px;
-  height: 16px;
-  animation: spin 1s linear infinite;
-  display: inline-block;
+  display: inline-block !important;
+  position: relative !important;
+  width: 6px !important;
+  height: 6px !important;
+  background-color: #2563eb !important; /* Premium primary blue */
+  border: none !important;
+  border-radius: 50% !important;
+  animation: dots-bounce 1.4s infinite ease-in-out both !important;
+  animation-delay: 0.16s !important;
+  vertical-align: middle !important;
+  margin: 0 16px !important; /* Add horizontal spacing for left/right dots */
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.spinner::before,
+.spinner::after {
+  content: '' !important;
+  position: absolute !important;
+  width: 6px !important;
+  height: 6px !important;
+  background-color: #2563eb !important;
+  border-radius: 50% !important;
+  top: 0 !important;
+  animation: dots-bounce 1.4s infinite ease-in-out both !important;
+}
+
+.spinner::before {
+  left: -12px !important;
+  animation-delay: 0s !important;
+}
+
+.spinner::after {
+  left: 12px !important;
+  animation-delay: 0.32s !important;
+}
+
+/* Button & Badge Spinner (White Dots) */
+.btn .spinner,
+.btn .spinner::before,
+.btn .spinner::after,
+.badge .spinner,
+.badge .spinner::before,
+.badge .spinner::after {
+  background-color: #ffffff !important;
+}
+
+/* Bouncing keyframe animation */
+@keyframes dots-bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.2;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
 }
 
 /* ==================================================== */

@@ -37,8 +37,8 @@ const TrafficReport = () => {
   const [reportData, setReportData] = useState(null);
 
   // Filter States
-  const [timeframe, setTimeframe] = useState('all_time');
-  const [interval, setInterval] = useState('1d'); // empty means let backend decide based on timeframe
+  const [timeframe, setTimeframe] = useState('this_week');
+  const [interval, setReportInterval] = useState('1d'); // empty means let backend decide based on timeframe
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedProxy, setSelectedProxy] = useState('');
   
@@ -278,7 +278,7 @@ const TrafficReport = () => {
             value={timeframe}
             onChange={(e) => {
               setTimeframe(e.target.value);
-              setInterval(''); // Reset manual interval override
+              setReportInterval(''); // Reset manual interval override
             }}
             className="form-control"
             style={{ width: '110px', height: '28px', padding: '2px 8px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12px', borderRadius: '6px' }}
@@ -294,7 +294,7 @@ const TrafficReport = () => {
           {/* Manual Interval toggle */}
           <select
             value={interval}
-            onChange={(e) => setInterval(e.target.value)}
+            onChange={(e) => setReportInterval(e.target.value)}
             className="form-control"
             style={{ width: '85px', height: '28px', padding: '2px 8px', backgroundColor: '#334155', border: '1px solid #475569', color: '#fff', fontSize: '12px', borderRadius: '6px' }}
           >

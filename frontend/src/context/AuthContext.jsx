@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -29,18 +29,18 @@ export const AuthProvider = ({ children }) => {
     } else {
       return { success: false, error: data.error || 'Login failed' };
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('jwt');
     localStorage.removeItem('user');
     setToken(null);
     setUser({});
     window.location.href = '/login';
-  };
+  }, []);
 
   // Custom authenticated fetch wrapper that handles token injection and 401s
-  const authFetch = async (url, options = {}) => {
+  const authFetch = useCallback(async (url, options = {}) => {
     if (!options.headers) {
       options.headers = {};
     }
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Fetch error:', error);
       throw error;
     }
-  };
+  }, [token, logout]);
 
   const isAuthenticated = !!token;
 
