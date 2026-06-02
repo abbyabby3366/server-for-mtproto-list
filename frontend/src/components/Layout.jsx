@@ -17,10 +17,27 @@ import {
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, authFetch } = useAuth();
   const { lang, t, toggleLang } = useLanguage();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [platform, setPlatform] = useState('android');
+
+  // Fetch platform configuration
+  useEffect(() => {
+    const fetchPlatform = async () => {
+      try {
+        const res = await authFetch('/api/platform');
+        if (res.ok) {
+          const data = await res.json();
+          setPlatform(data.platform);
+        }
+      } catch (err) {
+        console.error('Error fetching platform in Layout:', err);
+      }
+    };
+    fetchPlatform();
+  }, [authFetch]);
 
   // Automatically close mobile sidebar on route changes
   useEffect(() => {
@@ -32,7 +49,7 @@ const Layout = ({ children }) => {
     { path: '/logins', label: 'Recent Logins', icon: LogIn },
     { path: '/network', label: 'Network Usage', icon: Activity },
     { path: '/traffic-report', label: 'Traffic Report', icon: TrendingUp },
-    { path: '/xray', label: 'Xray IP Stats', icon: Cpu },
+    ...(platform === 'android' ? [{ path: '/xray', label: 'Xray IP Stats', icon: Cpu }] : []),
     { path: '/configs', label: 'App Config', icon: Sliders },
   ];
 

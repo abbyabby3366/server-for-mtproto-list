@@ -20,6 +20,10 @@ const Configs = () => {
   const { authFetch } = useAuth();
   const { t } = useLanguage();
 
+  // ----- PLATFORM STATE -----
+  const [platform, setPlatform] = useState('android');
+  const [platformLoading, setPlatformLoading] = useState(true);
+
   // ----- VERSION CONFIG STATE -----
   // Android state
   const [androidVersionCode, setAndroidVersionCode] = useState('');
@@ -129,6 +133,21 @@ const Configs = () => {
 
   // Load configs and history logs on mount
   useEffect(() => {
+    // Fetch platform configuration
+    const fetchPlatform = async () => {
+      try {
+        const res = await authFetch('/api/platform');
+        if (res.ok) {
+          const data = await res.json();
+          setPlatform(data.platform);
+        }
+      } catch (err) {
+        console.error('Error fetching platform:', err);
+      } finally {
+        setPlatformLoading(false);
+      }
+    };
+
     // 1. Fetch Android version configuration
     const fetchAndroidVersion = async () => {
       try {
@@ -210,6 +229,7 @@ const Configs = () => {
       }
     };
 
+    fetchPlatform();
     fetchAndroidVersion();
     fetchIosVersion();
     fetchExternalConfig();
@@ -493,13 +513,20 @@ const Configs = () => {
     }, 4000);
   };
 
+  if (platformLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <span className="spinner" style={{ borderTopColor: '#3498db', width: '40px', height: '40px' }}></span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* 1. APP VERSION CONFIGURATIONS (Android and iOS Side-by-Side) */}
-      <div className="grid grid-cols-2" style={{ gap: '24px', marginBottom: '0px' }}>
-        
-        {/* ANDROID VERSION CONFIG */}
+      {/* 1. APP VERSION CONFIGURATIONS */}
+      {platform === 'android' ? (
+        /* ANDROID VERSION CONFIG */
         <div className="card" style={{ marginBottom: 0 }}>
           <h2 className="card-title">
             <Sliders size={20} color="#3498db" />
@@ -722,8 +749,8 @@ const Configs = () => {
             )}
           </div>
         </div>
-
-        {/* IOS VERSION CONFIG */}
+      ) : (
+        /* IOS VERSION CONFIG */
         <div className="card" style={{ marginBottom: 0 }}>
           <h2 className="card-title">
             <Sliders size={20} color="#007aff" />
@@ -947,10 +974,10 @@ const Configs = () => {
             )}
           </div>
         </div>
-
-      </div>
+      )}
 
       {/* 2. EXTERNAL REDIRECTS CONFIG */}
+      {platform === 'android' && (
       <div className="card" style={{ transition: 'all 0.3s ease' }}>
         <div 
           onClick={() => setExtRedirectsOpen(!extRedirectsOpen)}
@@ -1223,8 +1250,10 @@ const Configs = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* 3. XRAY NODE IPS */}
+      {platform === 'android' && (
       <div className="card">
         <h2 className="card-title">
           <Network size={20} color="#2ecc71" />
@@ -1317,8 +1346,10 @@ const Configs = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* 4. MT PROXIES */}
+      {platform === 'ios' && (
       <div className="card">
         <h2 className="card-title">
           <Network size={20} color="#9b59b6" />
@@ -1433,6 +1464,7 @@ const Configs = () => {
           </div>
         )}
       </div>
+      )}
 
     </div>
   );

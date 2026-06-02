@@ -11,9 +11,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://desmondgiam_db_user:PCibd7pBM4XcOAHG@skywalker-tencent-clust.hr8apyw.mongodb.net/?appName=skywalker-tencent-cluster';
+const platform = (process.env.PLATFORM || 'android').toLowerCase();
+const MONGODB_URI = process.env.MONGODB_URI || 
+  (platform === 'ios' ? process.env.MONGODB_URI_IOS : process.env.MONGODB_URI_ANDROID) || 
+  'mongodb+srv://desmondgiam_db_user:PCibd7pBM4XcOAHG@skywalker-tencent-clust.hr8apyw.mongodb.net/?appName=skywalker-tencent-cluster';
+
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(() => console.log(`Connected to MongoDB (${platform.toUpperCase()})`))
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Schemas
@@ -501,6 +505,15 @@ app.post('/api/proxies', verifyToken, async (req, res) => {
     console.error('Error saving proxies from UI:', error.message);
     res.status(500).json({ error: 'Failed to update proxies' });
   }
+});
+
+
+/**
+ * GET /api/platform
+ * Returns the currently active platform configuration ('android' or 'ios').
+ */
+app.get('/api/platform', verifyToken, (req, res) => {
+  res.json({ platform: (process.env.PLATFORM || 'android').toLowerCase() });
 });
 
 
