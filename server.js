@@ -77,6 +77,27 @@ const androidVersionLogSchema = new mongoose.Schema({
 });
 const AndroidVersionLog = mongoose.model('AndroidVersionLog', androidVersionLogSchema);
 
+const iosVersionSchema = new mongoose.Schema({
+  versionCode: Number,
+  versionName: String,
+  downloadUrl: String,
+  changelog: String,
+  forceUpdate: Boolean
+});
+const IosVersion = mongoose.model('IosVersion', iosVersionSchema);
+
+const iosVersionLogSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  user: {
+    username: String,
+    role: String
+  },
+  previousConfig: Object,
+  newConfig: Object,
+  changedFields: [String]
+});
+const IosVersionLog = mongoose.model('IosVersionLog', iosVersionLogSchema);
+
 const externalRedirectLogSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   user: {
@@ -167,6 +188,25 @@ mongoose.connection.once('open', async () => {
     }
   } catch (err) {
     console.error('Error seeding MtProxyConfig:', err);
+  }
+});
+
+// Initialize default iOS version config if collection is empty
+mongoose.connection.once('open', async () => {
+  try {
+    const count = await IosVersion.countDocuments();
+    if (count === 0) {
+      await IosVersion.create({
+        versionCode: 100,
+        versionName: '1.0.0',
+        downloadUrl: 'https://apps.apple.com/app/id123456789',
+        changelog: 'Initial release',
+        forceUpdate: false
+      });
+      console.log('Seeded IosVersion with default configuration');
+    }
+  } catch (err) {
+    console.error('Error seeding IosVersion:', err);
   }
 });
 
@@ -578,6 +618,136 @@ app.get('/api/android/version/logs', verifyToken, async (req, res) => {
     res.json(logs);
   } catch (error) {
     console.error('Error fetching version logs:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * GET /api/ios/version
+ * Returns version metadata for iOS app update check.
+ */
+app.get('/api/ios/version', async (req, res) => {
+  try {
+    const version = await IosVersion.findOne();
+    if (version) {
+      const obj = version.toObject();
+      res.json({
+        version: obj.versionName || '',
+        version_code: obj.versionCode || 0,
+        file_url: obj.downloadUrl || '',
+        changelog: obj.changelog || '',
+        force_update: obj.forceUpdate || false
+      });
+    } else {
+      res.status(404).json({ error: 'iOS version configuration not found in MongoDB' });
+    }
+  } catch (error) {
+    console.error('Error reading iOS version metadata:', error.message);
+    res.status(500).json({ error: 'Failed to load version metadata' });
+  }
+});
+
+/**
+ * POST /api/ios/version
+ * Updates the version metadata for iOS app update check.
+ */
+app.post('/api/ios/version', verifyToken, async (req, res) => {
+  try {
+    const payload = req.body;
+    let version = await IosVersion.findOne();
+    
+    // Map input fields (supports both camelCase and snake_case)
+    const getField = (snakeKey, camelKey) => {
+      if (payload[snakeKey] !== undefined) return payload[snakeKey];
+      if (payload[camelKey] !== undefined) return payload[camelKey];
+      return undefined;
+    };
+
+    const payloadVersionCode = getField('version_code', 'versionCode');
+    const payloadVersionName = getField('version', 'versionName');
+    const payloadDownloadUrl = getField('file_url', 'downloadUrl');
+    const payloadChangelog = getField('changelog', 'changelog');
+    const payloadForceUpdate = getField('force_update', 'forceUpdate');
+
+    const fieldsToCheck = ['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'];
+    let prevObj = null;
+    let newObj = {};
+
+    if (version) {
+      prevObj = version.toObject();
+      newObj = {
+        versionCode: payloadVersionCode !== undefined ? payloadVersionCode : prevObj.versionCode,
+        versionName: payloadVersionName !== undefined ? payloadVersionName : prevObj.versionName,
+        downloadUrl: payloadDownloadUrl !== undefined ? payloadDownloadUrl : prevObj.downloadUrl,
+        changelog: payloadChangelog !== undefined ? payloadChangelog : prevObj.changelog,
+        forceUpdate: payloadForceUpdate !== undefined ? payloadForceUpdate : prevObj.forceUpdate
+      };
+    } else {
+      newObj = {
+        versionCode: payloadVersionCode !== undefined ? payloadVersionCode : 0,
+        versionName: payloadVersionName || '',
+        downloadUrl: payloadDownloadUrl || '',
+        changelog: payloadChangelog || '',
+        forceUpdate: payloadForceUpdate !== undefined ? !!payloadForceUpdate : false
+      };
+    }
+
+    const changedFields = [];
+    fieldsToCheck.forEach(field => {
+      const prevVal = prevObj ? prevObj[field] : undefined;
+      const newVal = newObj[field];
+      if (prevVal !== newVal) {
+        changedFields.push(field);
+      }
+    });
+
+    if (changedFields.length > 0) {
+      const logEntry = new IosVersionLog({
+        user: {
+          username: req.user.username,
+          role: req.user.role
+        },
+        previousConfig: prevObj ? {
+          versionCode: prevObj.versionCode,
+          versionName: prevObj.versionName,
+          downloadUrl: prevObj.downloadUrl,
+          changelog: prevObj.changelog,
+          forceUpdate: prevObj.forceUpdate
+        } : null,
+        newConfig: newObj,
+        changedFields
+      });
+      await logEntry.save();
+    }
+
+    if (version) {
+      if (payloadVersionCode !== undefined) version.versionCode = payloadVersionCode;
+      if (payloadVersionName !== undefined) version.versionName = payloadVersionName;
+      if (payloadDownloadUrl !== undefined) version.downloadUrl = payloadDownloadUrl;
+      if (payloadChangelog !== undefined) version.changelog = payloadChangelog;
+      if (payloadForceUpdate !== undefined) version.forceUpdate = payloadForceUpdate;
+      await version.save();
+    } else {
+      version = new IosVersion(newObj);
+      await version.save();
+    }
+    res.json({ status: 'updated' });
+  } catch (error) {
+    console.error('Error updating iOS version metadata:', error.message);
+    res.status(500).json({ error: 'Failed to update iOS version metadata' });
+  }
+});
+
+/**
+ * GET /api/ios/version/logs
+ * Returns historical changelogs for iOS app version configuration.
+ */
+app.get('/api/ios/version/logs', verifyToken, async (req, res) => {
+  try {
+    const logs = await IosVersionLog.find().sort({ timestamp: -1 }).limit(100);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching iOS version logs:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

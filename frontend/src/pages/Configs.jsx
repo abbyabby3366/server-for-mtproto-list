@@ -21,13 +21,23 @@ const Configs = () => {
   const { t } = useLanguage();
 
   // ----- VERSION CONFIG STATE -----
-  const [versionCode, setVersionCode] = useState('');
-  const [versionName, setVersionName] = useState('');
-  const [downloadUrl, setDownloadUrl] = useState('');
-  const [changelog, setChangelog] = useState('');
-  const [forceUpdate, setForceUpdate] = useState(false);
-  const [versionSaving, setVersionSaving] = useState(false);
-  const [versionNotification, setVersionNotification] = useState(null);
+  // Android state
+  const [androidVersionCode, setAndroidVersionCode] = useState('');
+  const [androidVersionName, setAndroidVersionName] = useState('');
+  const [androidDownloadUrl, setAndroidDownloadUrl] = useState('');
+  const [androidChangelog, setAndroidChangelog] = useState('');
+  const [androidForceUpdate, setAndroidForceUpdate] = useState(false);
+  const [androidVersionSaving, setAndroidVersionSaving] = useState(false);
+  const [androidVersionNotification, setAndroidVersionNotification] = useState(null);
+
+  // iOS state
+  const [iosVersionCode, setIosVersionCode] = useState('');
+  const [iosVersionName, setIosVersionName] = useState('');
+  const [iosDownloadUrl, setIosDownloadUrl] = useState('');
+  const [iosChangelog, setIosChangelog] = useState('');
+  const [iosForceUpdate, setIosForceUpdate] = useState(false);
+  const [iosVersionSaving, setIosVersionSaving] = useState(false);
+  const [iosVersionNotification, setIosVersionNotification] = useState(null);
 
   // ----- EXTERNAL REDIRECTS STATE -----
   const [extDownloadUrl, setExtDownloadUrl] = useState('');
@@ -59,26 +69,45 @@ const Configs = () => {
   const [proxiesLoading, setProxiesLoading] = useState(true);
 
   // ----- LOGGING & TELEMETRY HISTORY STATE -----
-  const [versionLogs, setVersionLogs] = useState([]);
-  const [versionLogsLoading, setVersionLogsLoading] = useState(false);
-  const [versionLogsExpanded, setVersionLogsExpanded] = useState(false);
+  const [androidVersionLogs, setAndroidVersionLogs] = useState([]);
+  const [androidVersionLogsLoading, setAndroidVersionLogsLoading] = useState(false);
+  const [androidVersionLogsExpanded, setAndroidVersionLogsExpanded] = useState(false);
+  const [iosVersionLogs, setIosVersionLogs] = useState([]);
+  const [iosVersionLogsLoading, setIosVersionLogsLoading] = useState(false);
+  const [iosVersionLogsExpanded, setIosVersionLogsExpanded] = useState(false);
   const [redirectLogs, setRedirectLogs] = useState([]);
   const [redirectLogsLoading, setRedirectLogsLoading] = useState(false);
   const [redirectLogsExpanded, setRedirectLogsExpanded] = useState(false);
 
-  // Load changelog history for App Versions
-  const fetchVersionLogs = async () => {
+  // Load changelog history for Android App Versions
+  const fetchAndroidVersionLogs = async () => {
     try {
-      setVersionLogsLoading(true);
+      setAndroidVersionLogsLoading(true);
       const res = await authFetch('/api/android/version/logs');
       if (res.ok) {
         const data = await res.json();
-        setVersionLogs(data);
+        setAndroidVersionLogs(data);
       }
     } catch (err) {
-      console.error('Error fetching version logs:', err);
+      console.error('Error fetching Android version logs:', err);
     } finally {
-      setVersionLogsLoading(false);
+      setAndroidVersionLogsLoading(false);
+    }
+  };
+
+  // Load changelog history for iOS App Versions
+  const fetchIosVersionLogs = async () => {
+    try {
+      setIosVersionLogsLoading(true);
+      const res = await authFetch('/api/ios/version/logs');
+      if (res.ok) {
+        const data = await res.json();
+        setIosVersionLogs(data);
+      }
+    } catch (err) {
+      console.error('Error fetching iOS version logs:', err);
+    } finally {
+      setIosVersionLogsLoading(false);
     }
   };
 
@@ -100,20 +129,38 @@ const Configs = () => {
 
   // Load configs and history logs on mount
   useEffect(() => {
-    // 1. Fetch version configuration
-    const fetchVersion = async () => {
+    // 1. Fetch Android version configuration
+    const fetchAndroidVersion = async () => {
       try {
         const res = await authFetch('/api/android/version');
         if (res.ok) {
           const data = await res.json();
-          setVersionCode(data.versionCode || '');
-          setVersionName(data.versionName || '');
-          setDownloadUrl(data.downloadUrl || '');
-          setChangelog(data.changelog || '');
-          setForceUpdate(data.forceUpdate || false);
+          setAndroidVersionCode(data.versionCode || '');
+          setAndroidVersionName(data.versionName || '');
+          setAndroidDownloadUrl(data.downloadUrl || '');
+          setAndroidChangelog(data.changelog || '');
+          setAndroidForceUpdate(data.forceUpdate || false);
         }
       } catch (err) {
-        console.error('Error fetching version config:', err);
+        console.error('Error fetching Android version config:', err);
+      }
+    };
+
+    // Fetch iOS version configuration
+    const fetchIosVersion = async () => {
+      try {
+        const res = await authFetch('/api/ios/version');
+        if (res.ok) {
+          const data = await res.json();
+          // GET /api/ios/version returns snake_case format
+          setIosVersionCode(data.version_code || '');
+          setIosVersionName(data.version || '');
+          setIosDownloadUrl(data.file_url || '');
+          setIosChangelog(data.changelog || '');
+          setIosForceUpdate(data.force_update || false);
+        }
+      } catch (err) {
+        console.error('Error fetching iOS version config:', err);
       }
     };
 
@@ -137,7 +184,6 @@ const Configs = () => {
         const res = await authFetch('/api/transit-ips');
         if (res.ok) {
           const data = await res.json();
-          // The API returns { ips: [], remarks: '' } for the UI
           setTransitIps(data.ips || []);
           setTransitRemarks(data.remarks || '');
         }
@@ -164,26 +210,28 @@ const Configs = () => {
       }
     };
 
-    fetchVersion();
+    fetchAndroidVersion();
+    fetchIosVersion();
     fetchExternalConfig();
     fetchTransitIps();
     fetchProxies();
-    fetchVersionLogs();
+    fetchAndroidVersionLogs();
+    fetchIosVersionLogs();
     fetchRedirectLogs();
   }, [authFetch]);
 
-  // Handle version form submit
-  const handleVersionSubmit = async (e) => {
+  // Handle Android version form submit
+  const handleAndroidVersionSubmit = async (e) => {
     e.preventDefault();
-    setVersionSaving(true);
-    setVersionNotification(null);
+    setAndroidVersionSaving(true);
+    setAndroidVersionNotification(null);
 
     const payload = {
-      versionCode: parseInt(versionCode, 10),
-      versionName,
-      downloadUrl,
-      changelog,
-      forceUpdate
+      versionCode: parseInt(androidVersionCode, 10),
+      versionName: androidVersionName,
+      downloadUrl: androidDownloadUrl,
+      changelog: androidChangelog,
+      forceUpdate: androidForceUpdate
     };
 
     try {
@@ -194,15 +242,49 @@ const Configs = () => {
       });
 
       if (res.ok) {
-        showNotification(setVersionNotification, t('Configuration saved successfully!'), 'success');
-        fetchVersionLogs();
+        showNotification(setAndroidVersionNotification, t('Configuration saved successfully!'), 'success');
+        fetchAndroidVersionLogs();
       } else {
-        showNotification(setVersionNotification, t('Failed to save configuration.'), 'error');
+        showNotification(setAndroidVersionNotification, t('Failed to save configuration.'), 'error');
       }
     } catch (err) {
-      showNotification(setVersionNotification, t('Error saving configuration.'), 'error');
+      showNotification(setAndroidVersionNotification, t('Error saving configuration.'), 'error');
     } finally {
-      setVersionSaving(false);
+      setAndroidVersionSaving(false);
+    }
+  };
+
+  // Handle iOS version form submit
+  const handleIosVersionSubmit = async (e) => {
+    e.preventDefault();
+    setIosVersionSaving(true);
+    setIosVersionNotification(null);
+
+    const payload = {
+      version_code: parseInt(iosVersionCode, 10),
+      version: iosVersionName,
+      file_url: iosDownloadUrl,
+      changelog: iosChangelog,
+      force_update: iosForceUpdate
+    };
+
+    try {
+      const res = await authFetch('/api/ios/version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        showNotification(setIosVersionNotification, t('Configuration saved successfully!'), 'success');
+        fetchIosVersionLogs();
+      } else {
+        showNotification(setIosVersionNotification, t('Failed to save configuration.'), 'error');
+      }
+    } catch (err) {
+      showNotification(setIosVersionNotification, t('Error saving configuration.'), 'error');
+    } finally {
+      setIosVersionSaving(false);
     }
   };
 
@@ -414,228 +496,458 @@ const Configs = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* 1. APP VERSION CONFIGURATION */}
-      <div className="card">
-        <h2 className="card-title">
-          <Sliders size={20} color="#3498db" />
-          {t('App Version Configuration')}
-        </h2>
-        <p className="card-subtitle">{t('Configure update metrics served at /api/android/version')}</p>
+      {/* 1. APP VERSION CONFIGURATIONS (Android and iOS Side-by-Side) */}
+      <div className="grid grid-cols-2" style={{ gap: '24px', marginBottom: '0px' }}>
         
-        <form onSubmit={handleVersionSubmit}>
-          <div className="grid grid-cols-2" style={{ gap: '16px' }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label htmlFor="versionCode">{t('Version Code')}</label>
-              <input
-                type="number"
-                id="versionCode"
-                className="form-control"
-                placeholder="e.g. 6514"
-                value={versionCode}
-                onChange={(e) => setVersionCode(e.target.value)}
-                required
-              />
+        {/* ANDROID VERSION CONFIG */}
+        <div className="card" style={{ marginBottom: 0 }}>
+          <h2 className="card-title">
+            <Sliders size={20} color="#3498db" />
+            {t('App Version Configuration (Android)')}
+          </h2>
+          <p className="card-subtitle">{t('Configure update metrics served at /api/android/version')}</p>
+          
+          <form onSubmit={handleAndroidVersionSubmit}>
+            <div className="grid grid-cols-2" style={{ gap: '16px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="androidVersionCode">{t('Version Code')}</label>
+                <input
+                  type="number"
+                  id="androidVersionCode"
+                  className="form-control"
+                  placeholder="e.g. 6514"
+                  value={androidVersionCode}
+                  onChange={(e) => setAndroidVersionCode(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="androidVersionName">{t('Version Name')}</label>
+                <input
+                  type="text"
+                  id="androidVersionName"
+                  className="form-control"
+                  placeholder="e.g. 12.4.5"
+                  value={androidVersionName}
+                  onChange={(e) => setAndroidVersionName(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-            
-            <div className="form-group" style={{ margin: 0 }}>
-              <label htmlFor="versionName">{t('Version Name')}</label>
+
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label htmlFor="androidDownloadUrl">{t('Download URL')}</label>
               <input
                 type="text"
-                id="versionName"
+                id="androidDownloadUrl"
                 className="form-control"
-                placeholder="e.g. 12.4.5"
-                value={versionName}
-                onChange={(e) => setVersionName(e.target.value)}
+                placeholder="https://..."
+                value={androidDownloadUrl}
+                onChange={(e) => setAndroidDownloadUrl(e.target.value)}
                 required
               />
             </div>
-          </div>
 
-          <div className="form-group" style={{ marginTop: '16px' }}>
-            <label htmlFor="downloadUrl">{t('Download URL')}</label>
-            <input
-              type="text"
-              id="downloadUrl"
-              className="form-control"
-              placeholder="https://..."
-              value={downloadUrl}
-              onChange={(e) => setDownloadUrl(e.target.value)}
-              required
-            />
-          </div>
+            <div className="form-group">
+              <label htmlFor="androidChangelog">{t('Changelog')}</label>
+              <textarea
+                id="androidChangelog"
+                className="form-control"
+                placeholder="Enter changelog details..."
+                style={{ minHeight: '80px', resize: 'vertical' }}
+                value={androidChangelog}
+                onChange={(e) => setAndroidChangelog(e.target.value)}
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="changelog">{t('Changelog')}</label>
-            <textarea
-              id="changelog"
-              className="form-control"
-              placeholder="Enter changelog details..."
-              style={{ minHeight: '80px', resize: 'vertical' }}
-              value={changelog}
-              onChange={(e) => setChangelog(e.target.value)}
-              required
-            />
-          </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+              <input
+                type="checkbox"
+                id="androidForceUpdate"
+                checked={androidForceUpdate}
+                onChange={(e) => setAndroidForceUpdate(e.target.checked)}
+                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+              />
+              <label htmlFor="androidForceUpdate" style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}>
+                {t('Require Force Update')}
+              </label>
+            </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-            <input
-              type="checkbox"
-              id="forceUpdate"
-              checked={forceUpdate}
-              onChange={(e) => setForceUpdate(e.target.checked)}
-              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-            />
-            <label htmlFor="forceUpdate" style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}>
-              {t('Require Force Update')}
-            </label>
-          </div>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={androidVersionSaving}
+            >
+              <Save size={16} />
+              {androidVersionSaving ? t('Saving...') : t('Save Configuration')}
+            </button>
+          </form>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            disabled={versionSaving}
-          >
-            <Save size={16} />
-            {versionSaving ? t('Saving...') : t('Save Configuration')}
-          </button>
-        </form>
-
-        {versionNotification && (
-          <div className={`notification notification-${versionNotification.type}`}>
-            {versionNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span>{versionNotification.message}</span>
-          </div>
-        )}
-
-        {/* App Version Change History Panel */}
-        <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
-          <button 
-            type="button" 
-            onClick={() => {
-              setVersionLogsExpanded(!versionLogsExpanded);
-              if (!versionLogsExpanded && versionLogs.length === 0) fetchVersionLogs();
-            }}
-            className="btn btn-outline" 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              backgroundColor: 'transparent', 
-              color: '#3498db', 
-              border: '1px solid #3498db',
-              borderRadius: '6px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontWeight: 500,
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}
-          >
-            <History size={14} />
-            {versionLogsExpanded ? t('Hide Change History') : t('View Change History')}
-          </button>
-
-          {versionLogsExpanded && (
-            <div style={{ marginTop: '16px' }}>
-              {versionLogsLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-                  <span className="spinner" style={{ borderTopColor: '#3498db', width: '20px', height: '20px' }}></span>
-                </div>
-              ) : versionLogs.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '8px 0 0 0' }}>
-                  {t('No change logs recorded yet.')}
-                </p>
-              ) : (
-                <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '12px' }}>
-                  <table style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '180px' }}>{t('Time & Operator')}</th>
-                        <th>{t('Changed Fields')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {versionLogs.map((log) => (
-                        <tr key={log._id}>
-                          <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                              {new Date(log.timestamp).toLocaleString()}
-                            </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              by <span style={{ fontWeight: 500, color: '#3498db' }}>{log.user?.username}</span>
-                              <span className="badge badge-info" style={{ marginLeft: '4px', fontSize: '9px', padding: '2px 4px' }}>
-                                {log.user?.role}
-                              </span>
-                            </div>
-                          </td>
-                          <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                            {log.previousConfig ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <table style={{ border: '1px solid #e2e8f0', width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                                  <thead>
-                                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                      <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Parameter')}</th>
-                                      <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Previous Value')}</th>
-                                      <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('New Value')}</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'].map((field) => {
-                                      const isChanged = log.changedFields?.includes(field);
-                                      const prevVal = String(log.previousConfig[field]);
-                                      const newVal = String(log.newConfig[field]);
-                                      return (
-                                        <tr key={field} style={{ 
-                                          borderBottom: '1px solid #e2e8f0',
-                                          backgroundColor: isChanged ? '#fffbeb' : 'transparent',
-                                          transition: 'background-color 0.2s'
-                                        }}>
-                                          <td style={{ padding: '6px', fontWeight: 500, color: isChanged ? '#d97706' : 'inherit' }}>
-                                            {t(field.charAt(0).toUpperCase() + field.slice(1))}
-                                          </td>
-                                          <td style={{ 
-                                            padding: '6px', 
-                                            color: isChanged ? '#d97706' : 'var(--text-muted)',
-                                            textDecoration: isChanged ? 'line-through' : 'none',
-                                            wordBreak: 'break-all'
-                                          }}>
-                                            {field === 'forceUpdate' ? (log.previousConfig[field] ? t('Yes') : t('No')) : prevVal || '-'}
-                                          </td>
-                                          <td style={{ 
-                                            padding: '6px', 
-                                            fontWeight: isChanged ? 600 : 'normal',
-                                            color: isChanged ? '#b45309' : 'var(--text-main)',
-                                            wordBreak: 'break-all'
-                                          }}>
-                                            {field === 'forceUpdate' ? (log.newConfig[field] ? t('Yes') : t('No')) : newVal || '-'}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div>
-                                <span className="badge badge-success">{t('Initial Configuration')}</span>
-                                <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                                  <strong>{t('Code')}:</strong> {log.newConfig?.versionCode} | <strong>{t('Name')}:</strong> {log.newConfig?.versionName}
-                                </div>
-                                <div style={{ fontSize: '12px', wordBreak: 'break-all' }}>
-                                  <strong>{t('URL')}:</strong> {log.newConfig?.downloadUrl}
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          {androidVersionNotification && (
+            <div className={`notification notification-${androidVersionNotification.type}`}>
+              {androidVersionNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+              <span>{androidVersionNotification.message}</span>
             </div>
           )}
+
+          {/* Android Version Change History Panel */}
+          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
+            <button 
+              type="button" 
+              onClick={() => {
+                setAndroidVersionLogsExpanded(!androidVersionLogsExpanded);
+                if (!androidVersionLogsExpanded && androidVersionLogs.length === 0) fetchAndroidVersionLogs();
+              }}
+              className="btn btn-outline" 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                backgroundColor: 'transparent', 
+                color: '#3498db', 
+                border: '1px solid #3498db',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontWeight: 500,
+                fontSize: '13px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <History size={14} />
+              {androidVersionLogsExpanded ? t('Hide Change History') : t('View Change History')}
+            </button>
+
+            {androidVersionLogsExpanded && (
+              <div style={{ marginTop: '16px' }}>
+                {androidVersionLogsLoading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+                    <span className="spinner" style={{ borderTopColor: '#3498db', width: '20px', height: '20px' }}></span>
+                  </div>
+                ) : androidVersionLogs.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+                    {t('No change logs recorded yet.')}
+                  </p>
+                ) : (
+                  <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '12px' }}>
+                    <table style={{ fontSize: '13px' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '150px' }}>{t('Time & Operator')}</th>
+                          <th>{t('Changed Fields')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {androidVersionLogs.map((log) => (
+                          <tr key={log._id}>
+                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                {new Date(log.timestamp).toLocaleString()}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                by <span style={{ fontWeight: 500, color: '#3498db' }}>{log.user?.username}</span>
+                                <span className="badge badge-info" style={{ marginLeft: '4px', fontSize: '9px', padding: '2px 4px' }}>
+                                  {log.user?.role}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
+                              {log.previousConfig ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <table style={{ border: '1px solid #e2e8f0', width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Parameter')}</th>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Previous Value')}</th>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('New Value')}</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'].map((field) => {
+                                        const isChanged = log.changedFields?.includes(field);
+                                        const prevVal = String(log.previousConfig[field]);
+                                        const newVal = String(log.newConfig[field]);
+                                        return (
+                                          <tr key={field} style={{ 
+                                            borderBottom: '1px solid #e2e8f0',
+                                            backgroundColor: isChanged ? '#fffbeb' : 'transparent',
+                                            transition: 'background-color 0.2s'
+                                          }}>
+                                            <td style={{ padding: '6px', fontWeight: 500, color: isChanged ? '#d97706' : 'inherit' }}>
+                                              {t(field)}
+                                            </td>
+                                            <td style={{ 
+                                              padding: '6px', 
+                                              color: isChanged ? '#d97706' : 'var(--text-muted)',
+                                              textDecoration: isChanged ? 'line-through' : 'none',
+                                              wordBreak: 'break-all'
+                                            }}>
+                                              {field === 'forceUpdate' ? (log.previousConfig[field] ? t('Yes') : t('No')) : prevVal || '-'}
+                                            </td>
+                                            <td style={{ 
+                                              padding: '6px', 
+                                              fontWeight: isChanged ? 600 : 'normal',
+                                              color: isChanged ? '#b45309' : 'var(--text-main)',
+                                              wordBreak: 'break-all'
+                                            }}>
+                                              {field === 'forceUpdate' ? (log.newConfig[field] ? t('Yes') : t('No')) : newVal || '-'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="badge badge-success">{t('Initial Configuration')}</span>
+                                  <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                                    <strong>{t('Code')}:</strong> {log.newConfig?.versionCode} | <strong>{t('Name')}:</strong> {log.newConfig?.versionName}
+                                  </div>
+                                  <div style={{ fontSize: '12px', wordBreak: 'break-all' }}>
+                                    <strong>{t('URL')}:</strong> {log.newConfig?.downloadUrl}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* IOS VERSION CONFIG */}
+        <div className="card" style={{ marginBottom: 0 }}>
+          <h2 className="card-title">
+            <Sliders size={20} color="#007aff" />
+            {t('App Version Configuration (iOS)')}
+          </h2>
+          <p className="card-subtitle">{t('Configure update metrics served at /api/ios/version')}</p>
+          
+          <form onSubmit={handleIosVersionSubmit}>
+            <div className="grid grid-cols-2" style={{ gap: '16px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="iosVersionCode">{t('Version Code')}</label>
+                <input
+                  type="number"
+                  id="iosVersionCode"
+                  className="form-control"
+                  placeholder="e.g. 120"
+                  value={iosVersionCode}
+                  onChange={(e) => setIosVersionCode(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="iosVersionName">{t('Version Name')}</label>
+                <input
+                  type="text"
+                  id="iosVersionName"
+                  className="form-control"
+                  placeholder="e.g. 1.2.0"
+                  value={iosVersionName}
+                  onChange={(e) => setIosVersionName(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label htmlFor="iosDownloadUrl">{t('Download URL')}</label>
+              <input
+                type="text"
+                id="iosDownloadUrl"
+                className="form-control"
+                placeholder="https://apps.apple.com/app/id..."
+                value={iosDownloadUrl}
+                onChange={(e) => setIosDownloadUrl(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="iosChangelog">{t('Changelog')}</label>
+              <textarea
+                id="iosChangelog"
+                className="form-control"
+                placeholder="Enter changelog details..."
+                style={{ minHeight: '80px', resize: 'vertical' }}
+                value={iosChangelog}
+                onChange={(e) => setIosChangelog(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+              <input
+                type="checkbox"
+                id="iosForceUpdate"
+                checked={iosForceUpdate}
+                onChange={(e) => setIosForceUpdate(e.target.checked)}
+                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+              />
+              <label htmlFor="iosForceUpdate" style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}>
+                {t('Require Force Update')}
+              </label>
+            </div>
+
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={iosVersionSaving}
+              style={{ backgroundColor: '#007aff' }}
+            >
+              <Save size={16} />
+              {iosVersionSaving ? t('Saving...') : t('Save Configuration')}
+            </button>
+          </form>
+
+          {iosVersionNotification && (
+            <div className={`notification notification-${iosVersionNotification.type}`}>
+              {iosVersionNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+              <span>{iosVersionNotification.message}</span>
+            </div>
+          )}
+
+          {/* iOS Version Change History Panel */}
+          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
+            <button 
+              type="button" 
+              onClick={() => {
+                setIosVersionLogsExpanded(!iosVersionLogsExpanded);
+                if (!iosVersionLogsExpanded && iosVersionLogs.length === 0) fetchIosVersionLogs();
+              }}
+              className="btn btn-outline" 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                backgroundColor: 'transparent', 
+                color: '#007aff', 
+                border: '1px solid #007aff',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontWeight: 500,
+                fontSize: '13px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <History size={14} />
+              {iosVersionLogsExpanded ? t('Hide Change History') : t('View Change History')}
+            </button>
+
+            {iosVersionLogsExpanded && (
+              <div style={{ marginTop: '16px' }}>
+                {iosVersionLogsLoading ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+                    <span className="spinner" style={{ borderTopColor: '#007aff', width: '20px', height: '20px' }}></span>
+                  </div>
+                ) : iosVersionLogs.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+                    {t('No change logs recorded yet.')}
+                  </p>
+                ) : (
+                  <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '12px' }}>
+                    <table style={{ fontSize: '13px' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '150px' }}>{t('Time & Operator')}</th>
+                          <th>{t('Changed Fields')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {iosVersionLogs.map((log) => (
+                          <tr key={log._id}>
+                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                                {new Date(log.timestamp).toLocaleString()}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                by <span style={{ fontWeight: 500, color: '#007aff' }}>{log.user?.username}</span>
+                                <span className="badge badge-info" style={{ marginLeft: '4px', fontSize: '9px', padding: '2px 4px', backgroundColor: '#e0f2fe', color: '#007aff' }}>
+                                  {log.user?.role}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
+                              {log.previousConfig ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  <table style={{ border: '1px solid #e2e8f0', width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Parameter')}</th>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Previous Value')}</th>
+                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('New Value')}</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'].map((field) => {
+                                        const isChanged = log.changedFields?.includes(field);
+                                        const prevVal = String(log.previousConfig[field]);
+                                        const newVal = String(log.newConfig[field]);
+                                        return (
+                                          <tr key={field} style={{ 
+                                            borderBottom: '1px solid #e2e8f0',
+                                            backgroundColor: isChanged ? '#fffbeb' : 'transparent',
+                                            transition: 'background-color 0.2s'
+                                          }}>
+                                            <td style={{ padding: '6px', fontWeight: 500, color: isChanged ? '#d97706' : 'inherit' }}>
+                                              {t(field)}
+                                            </td>
+                                            <td style={{ 
+                                              padding: '6px', 
+                                              color: isChanged ? '#d97706' : 'var(--text-muted)',
+                                              textDecoration: isChanged ? 'line-through' : 'none',
+                                              wordBreak: 'break-all'
+                                            }}>
+                                              {field === 'forceUpdate' ? (log.previousConfig[field] ? t('Yes') : t('No')) : prevVal || '-'}
+                                            </td>
+                                            <td style={{ 
+                                              padding: '6px', 
+                                              fontWeight: isChanged ? 600 : 'normal',
+                                              color: isChanged ? '#b45309' : 'var(--text-main)',
+                                              wordBreak: 'break-all'
+                                            }}>
+                                              {field === 'forceUpdate' ? (log.newConfig[field] ? t('Yes') : t('No')) : newVal || '-'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span className="badge badge-success">{t('Initial Configuration')}</span>
+                                  <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                                    <strong>{t('Code')}:</strong> {log.newConfig?.versionCode} | <strong>{t('Name')}:</strong> {log.newConfig?.versionName}
+                                  </div>
+                                  <div style={{ fontSize: '12px', wordBreak: 'break-all' }}>
+                                    <strong>{t('URL')}:</strong> {log.newConfig?.downloadUrl}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* 2. EXTERNAL REDIRECTS CONFIG */}
