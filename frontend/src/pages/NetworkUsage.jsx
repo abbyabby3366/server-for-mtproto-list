@@ -70,7 +70,7 @@ const NetworkUsage = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch telemetry function
+  // Fetch telemetry function — loads BOTH tabs in parallel for seamless switching
   const fetchTelemetry = useCallback(async (isAutoRefresh = false) => {
     if (!isAutoRefresh) {
       setLoading(true);
@@ -79,24 +79,24 @@ const NetworkUsage = () => {
     }
 
     try {
-      if (activeTab === 'user') {
-        const res = await authFetch(
+      const [usersRes, pingsRes] = await Promise.all([
+        authFetch(
           `/api/telemetry/network-users?page=${userPage}&limit=${itemsPerPage}&search=${encodeURIComponent(debouncedSearch)}&foreground=${foregroundFilter}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setUsersData(data.data || []);
-          setTotalUsers(data.total || 0);
-        }
-      } else {
-        const res = await authFetch(
+        ),
+        authFetch(
           `/api/telemetry/network-pings?page=${timePage}&limit=${itemsPerPage}&search=${encodeURIComponent(debouncedSearch)}&foreground=${foregroundFilter}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setPingsData(data.data || []);
-          setTotalPings(data.total || 0);
-        }
+        )
+      ]);
+
+      if (usersRes.ok) {
+        const data = await usersRes.json();
+        setUsersData(data.data || []);
+        setTotalUsers(data.total || 0);
+      }
+      if (pingsRes.ok) {
+        const data = await pingsRes.json();
+        setPingsData(data.data || []);
+        setTotalPings(data.total || 0);
       }
     } catch (err) {
       console.error('Error fetching network usage:', err);
@@ -104,7 +104,7 @@ const NetworkUsage = () => {
       setLoading(false);
       setIndicatorLoading(false);
     }
-  }, [activeTab, userPage, timePage, debouncedSearch, foregroundFilter, authFetch]);
+  }, [userPage, timePage, debouncedSearch, foregroundFilter, authFetch]);
 
   // Telemetry triggers and auto-polling (10s)
   useEffect(() => {
@@ -457,7 +457,14 @@ const NetworkUsage = () => {
             <div 
               onClick={() => setActiveTab('user')} 
               className={`tab ${activeTab === 'user' ? 'active' : ''}`}
-              style={{ padding: '12px 20px', cursor: 'pointer', borderBottom: '2px solid transparent', fontWeight: 600 }}
+              style={{ 
+                padding: '12px 20px', 
+                cursor: 'pointer', 
+                borderBottom: activeTab === 'user' ? '2px solid #3498db' : '2px solid transparent', 
+                fontWeight: 600,
+                color: activeTab === 'user' ? '#3498db' : '#64748b',
+                transition: 'color 0.2s, border-color 0.2s'
+              }}
             >
               {t('Users')}{' '}
               <span style={{ fontSize: '0.9em', opacity: 0.8 }}>({totalUsers})</span>
@@ -465,7 +472,14 @@ const NetworkUsage = () => {
             <div 
               onClick={() => setActiveTab('time')} 
               className={`tab ${activeTab === 'time' ? 'active' : ''}`}
-              style={{ padding: '12px 20px', cursor: 'pointer', borderBottom: '2px solid transparent', fontWeight: 600 }}
+              style={{ 
+                padding: '12px 20px', 
+                cursor: 'pointer', 
+                borderBottom: activeTab === 'time' ? '2px solid #3498db' : '2px solid transparent', 
+                fontWeight: 600,
+                color: activeTab === 'time' ? '#3498db' : '#64748b',
+                transition: 'color 0.2s, border-color 0.2s'
+              }}
             >
               {t('All Pings')}{' '}
               <span style={{ fontSize: '0.9em', opacity: 0.8 }}>({totalPings})</span>
