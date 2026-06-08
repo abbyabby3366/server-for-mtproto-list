@@ -41,6 +41,15 @@ const translations = {
   "Raw MongoDB Telemetries (Buckets)": "原始 MongoDB 遙測數據 (Buckets)",
   "Date": "日期",
   "Date/Time": "日期 / 時間",
+  "Flush Old Pings (Keep Latest)": "清理舊 Ping 記錄 (保留最新)",
+  "Are you sure you want to flush old network pings while keeping the latest ping per user?": "您確定要清理舊的網路 Ping 記錄，並保留每個用戶的最新記錄嗎？",
+  "Successfully flushed": "成功清理了",
+  "old records (retention period:": "條舊記錄 (保留期:",
+  "days).": "天)。",
+  "Failed to flush:": "清理失敗:",
+  "Error flushing records.": "清理記錄時出錯。",
+  "Enter data retention days (documents older than this will be deleted, keeping the latest per user):": "請輸入數據保留天數 (早於此天數的數據將被刪除，且保留每個用戶的最新記錄):",
+  "Please enter a valid number of days.": "請輸入有效的保留天數。",
   
   // Xray
   "Active Xray Proxy Servers": "活躍的 Xray 代理服務器",

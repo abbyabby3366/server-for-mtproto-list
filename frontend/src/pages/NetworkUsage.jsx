@@ -219,6 +219,48 @@ const NetworkUsage = () => {
     }
   };
 
+  const handleFlushOldPings = async () => {
+    setShowDeleteMenu(false);
+
+    // Prompt user for data retention days (default 7)
+    const inputDays = window.prompt(t('Enter data retention days (documents older than this will be deleted, keeping the latest per user):'), '7');
+    if (inputDays === null) return; // cancel click
+
+    const days = parseInt(inputDays);
+    if (isNaN(days) || days <= 0) {
+      alert(t('Please enter a valid number of days.'));
+      return;
+    }
+
+    if (!window.confirm(t('Are you sure you want to flush old network pings while keeping the latest ping per user?'))) {
+      return;
+    }
+
+    try {
+      const res = await authFetch(`/api/telemetry/flush-network`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ days })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`${t('Successfully flushed')} ${data.deletedCount} ${t('old records (retention period:')} ${data.days} ${t('days).')}`);
+        setUserPage(1);
+        setTimePage(1);
+        fetchTelemetry(false);
+      } else {
+        const errData = await res.json();
+        alert(`${t('Failed to flush:')} ${errData.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert(t('Error flushing records.'));
+    }
+  };
+
   // Details Modal clean fields display
   const handleOpenDetails = (row) => {
     const clean = { ...row };
@@ -378,6 +420,14 @@ const NetworkUsage = () => {
                   className="dropdown-item"
                 >
                   {t('Older than last month')}
+                </div>
+                <div style={{ borderTop: '1px solid var(--border-color)' }}></div>
+                <div 
+                  onClick={handleFlushOldPings} 
+                  style={{ padding: '10px 14px', cursor: 'pointer', fontSize: '13px', color: '#f39c12', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                  className="dropdown-item"
+                >
+                  {t('Flush Old Pings (Keep Latest)')}
                 </div>
                 <div style={{ borderTop: '1px solid var(--border-color)' }}></div>
                 <div 

@@ -1188,6 +1188,43 @@ app.delete('/api/telemetry/network', verifyToken, async (req, res) => {
 });
 
 /**
+ * POST /api/telemetry/flush-network
+ * Flushes old network telemetry records keeping the latest ping per user.
+ */
+app.post('/api/telemetry/flush-network', verifyToken, async (req, res) => {
+  try {
+    // Use nullish coalescing (??) so that an explicit value of 0 from body
+    // doesn't silently fall through to query/env — though 0 is still invalid below.
+    const rawDays = req.body.days ?? req.query.days ?? process.env.DATA_RETENTION_DAYS ?? 7;
+    let days = parseInt(rawDays);
+    if (isNaN(days) || days <= 0) {
+      days = 7;
+    }
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    // Find the latest _id per user_id to keep
+    const latestPerUser = await NetworkTelemetry.aggregate([
+      { $group: { _id: '$user_id', latestId: { $max: '$_id' } } }
+    ]);
+    const keepIds = latestPerUser.map(u => u.latestId).filter(Boolean);
+
+    // Delete old docs that are NOT the latest for their user
+    const result = await NetworkTelemetry.deleteMany({
+      last_updated: { $lt: cutoff },
+      _id: { $nin: keepIds }
+    });
+
+    console.log(`[ManualFlush] Deleted ${result.deletedCount} old NetworkTelemetry records (older than ${days} days, keeping latest per user)`);
+    res.json({ status: 'flushed', deletedCount: result.deletedCount, days });
+  } catch (error) {
+    console.error('[ManualFlush] Error during flush:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * GET /api/telemetry/network-pings
  * Server-side paginated and searched endpoint for All Pings
  */
