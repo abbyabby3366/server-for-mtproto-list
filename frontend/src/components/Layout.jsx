@@ -13,7 +13,8 @@ import {
   Globe,
   TrendingUp,
   Menu,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -140,6 +141,19 @@ const Layout = ({ children }) => {
               </span>
             </div>
           </div>
+
+          <button
+            onClick={() => {
+              window.location.href = platform === 'android'
+                ? 'https://talkpro-ios-api.grapefruittalk.com/'
+                : 'https://talkpro.grapefruittalk.com/';
+            }}
+            className="btn"
+            style={{ width: '100%', padding: '8px 10px', fontSize: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderRadius: '6px', cursor: 'pointer', marginTop: '4px', fontWeight: 600 }}
+          >
+            <Smartphone size={14} />
+            <span>{platform === 'android' ? t('Switch to iOS Backend') : t('Switch to Android Backend')}</span>
+          </button>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
             {/* Language Selection */}

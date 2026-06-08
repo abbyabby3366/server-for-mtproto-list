@@ -164,6 +164,8 @@ const translations = {
   "English": "English",
   "中文": "中文",
   "Logout": "登出",
+  "Switch to iOS Backend": "切換至 iOS 後端",
+  "Switch to Android Backend": "切換至 Android 後端",
   "Change Password": "修改密碼",
   "Delete": "刪除",
   "Actions": "操作",
