@@ -1385,6 +1385,7 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     const skip = (page - 1) * limit;
     const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
     const foreground = req.query.foreground;
+    const sortBy = req.query.sort || 'last_updated';
 
     let pipeline = [];
 
@@ -1440,12 +1441,40 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
       pipeline.push({ $match: { $and: matchFilters } });
     }
 
+    // Lookup first login time BEFORE facet if we want to sort by it
+    if (sortBy === 'firstLoginTime') {
+      pipeline.push({
+        $lookup: {
+          from: "logintelemetries",
+          let: { uid: "$user_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$$uid", "$telegram_user.user_id"] } } },
+            { $project: { timestamp: 1 } },
+            { $sort: { timestamp: 1 } },
+            { $limit: 1 }
+          ],
+          as: "firstLogin"
+        }
+      });
+      pipeline.push({
+        $addFields: {
+          firstLoginTime: {
+            $cond: {
+              if: { $gt: [{ $size: "$firstLogin" }, 0] },
+              then: { $arrayElemAt: ["$firstLogin.timestamp", 0] },
+              else: null
+            }
+          }
+        }
+      });
+    }
+
     // 3. Facet: count + paginate FIRST, then enrich
     pipeline.push({
       $facet: {
         metadata: [{ $count: 'total' }],
         data: [
-          { $sort: { last_updated: -1 } },
+          { $sort: sortBy === 'firstLoginTime' ? { firstLoginTime: -1, last_updated: -1 } : { last_updated: -1 } },
           { $skip: skip },
           { $limit: limit }
         ]
@@ -1459,24 +1488,65 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     // 4. Batch-enrich only the paginated results with login data
     const userIds = [...new Set(rawDocs.map(d => d.user_id).filter(Boolean))];
     const loginLookup = {};
+    const firstLoginLookup = {};
+    const todayTrafficLookup = {};
+
     if (userIds.length > 0) {
-      const logins = await LoginTelemetry.aggregate([
-        { $match: { 'telegram_user.user_id': { $in: userIds } } },
-        { $sort: { timestamp: -1 } },
-        { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const [logins, firstLogins, todayTraffic] = await Promise.all([
+        LoginTelemetry.aggregate([
+          { $match: { 'telegram_user.user_id': { $in: userIds } } },
+          { $sort: { timestamp: -1 } },
+          { $group: { _id: '$telegram_user.user_id', doc: { $first: '$telegram_user' } } }
+        ]),
+        LoginTelemetry.aggregate([
+          { $match: { 'telegram_user.user_id': { $in: userIds } } },
+          { $sort: { timestamp: 1 } },
+          { $group: { _id: '$telegram_user.user_id', firstLoginTime: { $first: '$timestamp' } } }
+        ]),
+        NetworkTelemetry.aggregate([
+          { 
+            $match: { 
+              user_id: { $in: userIds },
+              last_updated: { $gte: todayStart }
+            } 
+          },
+          {
+            $group: {
+              _id: "$user_id",
+              todaySent: { $sum: "$delta_sent" },
+              todayReceived: { $sum: "$delta_received" }
+            }
+          }
+        ])
       ]);
+
       logins.forEach(l => { loginLookup[l._id] = l.doc; });
+      firstLogins.forEach(fl => { firstLoginLookup[fl._id] = fl.firstLoginTime; });
+      todayTraffic.forEach(t => {
+        todayTrafficLookup[t._id] = {
+          sent: t.todaySent || 0,
+          received: t.todayReceived || 0
+        };
+      });
     }
 
     const mappedData = rawDocs.map(net => {
       const login = loginLookup[net.user_id] || {};
+      const firstLoginTime = net.firstLoginTime || firstLoginLookup[net.user_id] || null;
+      const todayT = todayTrafficLookup[net.user_id] || { sent: 0, received: 0 };
       return {
         ...net,
         active_proxy_ip: net.active_proxy_ip || net.active_connection?.ip || 'Unknown',
         phone_number: net.telegram_user?.phone_number || login.phone_number || '',
         first_name: net.telegram_user?.first_name || login.first_name || 'Unknown',
         last_name: net.telegram_user?.last_name || login.last_name || '',
-        username: net.telegram_user?.username || login.username || ''
+        username: net.telegram_user?.username || login.username || '',
+        first_login_time: firstLoginTime,
+        today_sent: todayT.sent,
+        today_received: todayT.received
       };
     });
 

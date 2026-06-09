@@ -9,6 +9,10 @@ const translations = {
   "Xray IP Stats": "Xray IP 統計",
   "App Config": "應用配置",
   "Analytics": "儀表盤",
+  "TalkPro Users": "TalkPro 用戶",
+  "First Login Time": "創建時間（第一次登錄時間）",
+  "Last Ping": "最後 Ping 時間",
+  "Last Ping Details": "最後 Ping 詳情",
 
   // Network Usage
   "Network IP": "網路 IP",

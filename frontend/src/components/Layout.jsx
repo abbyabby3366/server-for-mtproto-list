@@ -47,6 +47,7 @@ const Layout = ({ children }) => {
 
   const menuItems = [
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/talkpro-users', label: 'TalkPro Users', icon: Users },
     { path: '/logins', label: 'Recent Logins', icon: LogIn },
     { path: '/network', label: 'Network Usage', icon: Activity },
     { path: '/traffic-report', label: 'Traffic Report', icon: TrendingUp },
