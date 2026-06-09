@@ -363,6 +363,7 @@ const NetworkUsage = () => {
               <option value="all">{t('All Traffic')}</option>
               <option value="true">{t('Foreground Only')}</option>
               <option value="false">{t('Background Only')}</option>
+              <option value="na">{t('Legacy (N/A)')}</option>
             </select>
             
             <button 

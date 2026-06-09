@@ -13,6 +13,10 @@ const translations = {
   "First Login Time": "創建時間（第一次登錄時間）",
   "Last Ping": "最後 Ping 時間",
   "Last Ping Details": "最後 Ping 詳情",
+  "Traffic Type": "流量類型",
+  "Timeframe": "時間範圍",
+  "Last Ping Type": "最後 Ping 類型",
+  "Legacy (N/A)": "舊版 (不適用)",
 
   // Network Usage
   "Network IP": "網路 IP",

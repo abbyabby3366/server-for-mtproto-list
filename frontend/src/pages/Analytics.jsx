@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { BarChart3, Users, Download, Upload, Clock, Info, ArrowUpDown } from 'lucide-react';
+import { BarChart3, Users, Download, Upload, Clock, Info, ArrowUpDown, ChevronRight } from 'lucide-react';
 
 export const formatBytes = (bytes) => {
   if (bytes === 0 || !bytes) return '0 B';
@@ -30,9 +31,12 @@ export const calculateCostOnly = (bytes) => {
 const Analytics = () => {
   const { authFetch } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [timeframe, setTimeframe] = useState('today');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isForegroundHovered, setIsForegroundHovered] = useState(false);
+  const [isBackgroundHovered, setIsBackgroundHovered] = useState(false);
 
   const loadData = useCallback(async (showLoadingSpinner = false) => {
     if (showLoadingSpinner) setLoading(true);
@@ -115,28 +119,60 @@ const Analytics = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* Row 1: User count period statistics */}
             <div className="grid grid-cols-4" style={{ gap: '8px' }}>
-              <div className="card" style={{ borderLeft: '4px solid #2ecc71', margin: 0, padding: '8px 10px' }}>
+              <div 
+                className="card" 
+                onClick={() => navigate(`/talkpro-users?foreground=true&timeframe=${timeframe}`)}
+                onMouseEnter={() => setIsForegroundHovered(true)}
+                onMouseLeave={() => setIsForegroundHovered(false)}
+                style={{ 
+                  borderLeft: '4px solid #2ecc71', 
+                  margin: 0, 
+                  padding: '8px 10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  transform: isForegroundHovered ? 'translateY(-2px)' : 'none',
+                  boxShadow: isForegroundHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' : 'none',
+                  backgroundColor: isForegroundHovered ? '#f8fafc' : 'white'
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
                       {data?.dailyActiveUsersForeground ?? 0}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       {t('Users with at least one foreground ping')}
+                      <ChevronRight size={10} style={{ opacity: 0.7 }} />
                     </div>
                   </div>
                   <Users size={14} color="#2ecc71" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #3498db', margin: 0, padding: '8px 10px' }}>
+              <div 
+                className="card" 
+                onClick={() => navigate(`/talkpro-users?foreground=false&timeframe=${timeframe}`)}
+                onMouseEnter={() => setIsBackgroundHovered(true)}
+                onMouseLeave={() => setIsBackgroundHovered(false)}
+                style={{ 
+                  borderLeft: '4px solid #3498db', 
+                  margin: 0, 
+                  padding: '8px 10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  transform: isBackgroundHovered ? 'translateY(-2px)' : 'none',
+                  boxShadow: isBackgroundHovered ? '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' : 'none',
+                  backgroundColor: isBackgroundHovered ? '#f8fafc' : 'white'
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
                       {data?.dailyActiveUsersBackground ?? 0}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       {t('Users with strictly background pings only')}
+                      <ChevronRight size={10} style={{ opacity: 0.7 }} />
                     </div>
                   </div>
                   <Users size={14} color="#3498db" />

@@ -20,7 +20,12 @@ const TalkProUsers = () => {
   // ----- STATE -----
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [foregroundFilter, setForegroundFilter] = useState('all');
+  const [foregroundFilter, setForegroundFilter] = useState(() => {
+    return searchParams.get('foreground') || 'all';
+  });
+  const [timeframe, setTimeframe] = useState(() => {
+    return searchParams.get('timeframe') || 'all_time';
+  });
   const [loading, setLoading] = useState(true);
   const [indicatorLoading, setIndicatorLoading] = useState(false);
   const [userPage, setUserPage] = useState(1);
@@ -44,7 +49,16 @@ const TalkProUsers = () => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch unique users with sort=firstLoginTime
+  // Sync state from query parameters on navigation
+  useEffect(() => {
+    const fg = searchParams.get('foreground');
+    if (fg !== null) setForegroundFilter(fg);
+    const tf = searchParams.get('timeframe');
+    if (tf !== null) setTimeframe(tf);
+    setUserPage(1);
+  }, [searchParams]);
+
+  // Fetch unique users with sort=firstLoginTime and timeframe
   const fetchUsers = useCallback(async (isAutoRefresh = false) => {
     if (!isAutoRefresh) {
       setLoading(true);
@@ -54,7 +68,7 @@ const TalkProUsers = () => {
 
     try {
       const res = await authFetch(
-        `/api/telemetry/network-users?page=${userPage}&limit=${itemsPerPage}&search=${encodeURIComponent(debouncedSearch)}&foreground=${foregroundFilter}&sort=firstLoginTime`
+        `/api/telemetry/network-users?page=${userPage}&limit=${itemsPerPage}&search=${encodeURIComponent(debouncedSearch)}&foreground=${foregroundFilter}&sort=firstLoginTime&timeframe=${timeframe}`
       );
 
       if (res.ok) {
@@ -68,7 +82,7 @@ const TalkProUsers = () => {
       setLoading(false);
       setIndicatorLoading(false);
     }
-  }, [userPage, debouncedSearch, foregroundFilter, authFetch]);
+  }, [userPage, debouncedSearch, foregroundFilter, timeframe, authFetch]);
 
   // Telemetry triggers and auto-polling (10s)
   useEffect(() => {
@@ -167,19 +181,47 @@ const TalkProUsers = () => {
               />
             </div>
 
-            <select
-              value={foregroundFilter}
-              onChange={(e) => {
-                setForegroundFilter(e.target.value);
-                setUserPage(1);
-              }}
-              className="form-control"
-              style={{ width: 'auto', margin: 0, padding: '8px 12px', fontSize: '13px' }}
-            >
-              <option value="all">{t('All Traffic')}</option>
-              <option value="true">{t('Foreground Only')}</option>
-              <option value="false">{t('Background Only')}</option>
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+                {t('Last Ping Type')}:
+              </span>
+              <select
+                value={foregroundFilter}
+                onChange={(e) => {
+                  setForegroundFilter(e.target.value);
+                  setUserPage(1);
+                }}
+                className="form-control"
+                style={{ width: 'auto', margin: 0, padding: '8px 12px', fontSize: '13px' }}
+              >
+                <option value="all">{t('All Traffic')}</option>
+                <option value="true">{t('Foreground Only')}</option>
+                <option value="false">{t('Background Only')}</option>
+                <option value="na">{t('Legacy (N/A)')}</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+                {t('Last Ping')}:
+              </span>
+              <select
+                value={timeframe}
+                onChange={(e) => {
+                  setTimeframe(e.target.value);
+                  setUserPage(1);
+                }}
+                className="form-control"
+                style={{ width: 'auto', margin: 0, padding: '8px 12px', fontSize: '13px' }}
+              >
+                <option value="last_15_mins">{t('Last 15 Mins')}</option>
+                <option value="last_hour">{t('Last Hour')}</option>
+                <option value="today">{t('Today')}</option>
+                <option value="yesterday">{t('Yesterday')}</option>
+                <option value="this_week">{t('This Week')}</option>
+                <option value="all_time">{t('All Time')}</option>
+              </select>
+            </div>
           </div>
         </div>
 

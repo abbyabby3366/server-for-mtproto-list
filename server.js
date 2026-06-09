@@ -1241,13 +1241,21 @@ app.get('/api/telemetry/network-pings', verifyToken, async (req, res) => {
       const query = {};
       if (foreground === 'true') {
         query.$or = [
-          { delta_sent: { $gt: 0 } },
-          { delta_received: { $gt: 0 } }
+          { 'device_info.is_in_foreground': true },
+          { is_foreground: true },
+          { isForeground: true }
         ];
       } else if (foreground === 'false') {
         query.$and = [
-          { $or: [ { delta_sent: { $exists: false } }, { delta_sent: { $lte: 0 } } ] },
-          { $or: [ { delta_received: { $exists: false } }, { delta_received: { $lte: 0 } } ] }
+          { 'device_info.is_in_foreground': { $ne: true } },
+          { is_foreground: { $ne: true } },
+          { isForeground: { $ne: true } }
+        ];
+      } else if (foreground === 'na') {
+        query.$and = [
+          { 'device_info.is_in_foreground': { $exists: false } },
+          { is_foreground: { $exists: false } },
+          { isForeground: { $exists: false } }
         ];
       }
 
@@ -1314,15 +1322,25 @@ app.get('/api/telemetry/network-pings', verifyToken, async (req, res) => {
     if (foreground === 'true') {
       matchQuery.$and.push({
         $or: [
-          { delta_sent: { $gt: 0 } },
-          { delta_received: { $gt: 0 } }
+          { 'device_info.is_in_foreground': true },
+          { is_foreground: true },
+          { isForeground: true }
         ]
       });
     } else if (foreground === 'false') {
       matchQuery.$and.push({
         $and: [
-          { $or: [ { delta_sent: { $exists: false } }, { delta_sent: { $lte: 0 } } ] },
-          { $or: [ { delta_received: { $exists: false } }, { delta_received: { $lte: 0 } } ] }
+          { 'device_info.is_in_foreground': { $ne: true } },
+          { is_foreground: { $ne: true } },
+          { isForeground: { $ne: true } }
+        ]
+      });
+    } else if (foreground === 'na') {
+      matchQuery.$and.push({
+        $and: [
+          { 'device_info.is_in_foreground': { $exists: false } },
+          { is_foreground: { $exists: false } },
+          { isForeground: { $exists: false } }
         ]
       });
     }
@@ -1386,18 +1404,84 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     const search = req.query.search ? req.query.search.toLowerCase().trim() : '';
     const foreground = req.query.foreground;
     const sortBy = req.query.sort || 'last_updated';
+    const timeframe = req.query.timeframe || 'all_time';
+
+    let timeframeQuery = {};
+    if (timeframe !== 'all_time') {
+      const now = new Date();
+      let startTime, endTime;
+      if (timeframe === 'today') {
+        startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+        timeframeQuery = { last_updated: { $gte: startTime, $lt: endTime } };
+      } else if (timeframe === 'yesterday') {
+        startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        endTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+        timeframeQuery = { last_updated: { $gte: startTime, $lt: endTime } };
+      } else if (timeframe === 'this_week') {
+        startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+        endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        timeframeQuery = { last_updated: { $gte: startTime, $lt: endTime } };
+      } else if (timeframe === 'last_15_mins') {
+        startTime = new Date(now.getTime() - 15 * 60 * 1000);
+        endTime = now;
+        timeframeQuery = { last_updated: { $gte: startTime, $lte: endTime } };
+      } else if (timeframe === 'last_hour') {
+        startTime = new Date(now.getTime() - 60 * 60 * 1000);
+        endTime = now;
+        timeframeQuery = { last_updated: { $gte: startTime, $lte: endTime } };
+      }
+    }
 
     let pipeline = [];
+
+    if (Object.keys(timeframeQuery).length > 0) {
+      pipeline.push({ $match: timeframeQuery });
+    }
 
     // 1. Group by user_id to get unique users, taking the latest record
     pipeline.push({ $sort: { last_updated: -1 } });
     pipeline.push({
       $group: {
         _id: "$user_id",
-        doc: { $first: "$$ROOT" }
+        doc: { $first: "$$ROOT" },
+        hasForeground: { $max: {
+          $cond: [
+            { $or: [
+              { $eq: ["$device_info.is_in_foreground", true] },
+              { $eq: ["$is_foreground", true] },
+              { $eq: ["$isForeground", true] }
+            ] },
+            true,
+            false
+          ]
+        } },
+        hasBackground: { $max: {
+          $cond: [
+            { $or: [
+              { $eq: ["$device_info.is_in_foreground", false] },
+              { $eq: ["$is_foreground", false] },
+              { $eq: ["$isForeground", false] }
+            ] },
+            true,
+            false
+          ]
+        } }
       }
     });
-    pipeline.push({ $replaceRoot: { newRoot: "$doc" } });
+    pipeline.push({
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: [
+            "$doc",
+            {
+              hasForeground: "$hasForeground",
+              hasBackground: "$hasBackground"
+            }
+          ]
+        }
+      }
+    });
 
     // 2. Search & Foreground filter on local fields BEFORE any $lookup
     const matchFilters = [];
@@ -1422,18 +1506,16 @@ app.get('/api/telemetry/network-users', verifyToken, async (req, res) => {
     }
 
     if (foreground === 'true') {
-      matchFilters.push({
-        $or: [
-          { delta_sent: { $gt: 0 } },
-          { delta_received: { $gt: 0 } }
-        ]
-      });
+      matchFilters.push({ hasForeground: true });
     } else if (foreground === 'false') {
       matchFilters.push({
-        $and: [
-          { $or: [ { delta_sent: { $exists: false } }, { delta_sent: { $lte: 0 } } ] },
-          { $or: [ { delta_received: { $exists: false } }, { delta_received: { $lte: 0 } } ] }
-        ]
+        hasForeground: false,
+        hasBackground: true
+      });
+    } else if (foreground === 'na') {
+      matchFilters.push({
+        hasForeground: false,
+        hasBackground: false
       });
     }
 

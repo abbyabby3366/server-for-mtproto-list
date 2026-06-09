@@ -98,7 +98,7 @@ const Layout = ({ children }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
             <img src="/favicon.png" alt="Grapefruit" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             <div>
-              <h1 className="sidebar-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', lineHeight: '1.2' }}>GrapeFruitTalk v1.1</h1>
+              <h1 className="sidebar-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', lineHeight: '1.2' }}>GrapeFruitTalk v1.2</h1>
               <span style={{ fontSize: '10px', color: '#ea580c', fontWeight: 700, letterSpacing: '0.05em' }}>TELEMETRY HUB</span>
             </div>
           </div>
