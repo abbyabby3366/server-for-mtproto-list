@@ -8,7 +8,7 @@ const translations = {
   "Network Usage": "網路流量",
   "Xray IP Stats": "Xray IP 統計",
   "App Config": "應用配置",
-  "Analytics": "數據分析",
+  "Analytics": "儀表盤",
 
   // Network Usage
   "Network IP": "網路 IP",
@@ -50,7 +50,7 @@ const translations = {
   "Error flushing records.": "清理記錄時出錯。",
   "Enter data retention days (documents older than this will be deleted, keeping the latest per user):": "請輸入數據保留天數 (早於此天數的數據將被刪除，且保留每個用戶的最新記錄):",
   "Please enter a valid number of days.": "請輸入有效的保留天數。",
-  
+
   // Xray
   "Active Xray Proxy Servers": "活躍的 Xray 代理服務器",
   "Proxy IP": "代理 IP",
@@ -116,7 +116,7 @@ const translations = {
   "Error saving MT Proxies.": "保存 MT 代理出錯。",
 
   // Analytics
-  "TalkPro Telemetry - Analytics": "TalkPro 遙測 - 數據分析",
+  "TalkPro Telemetry - Analytics": "TalkPro 遙測 - 儀表盤",
   "Network Statistics": "網路統計",
   "Daily Network Statistics": "每日網路統計",
   "Daily Active Users": "每日活躍用戶",
@@ -125,9 +125,9 @@ const translations = {
   "Active Users (Foreground Only)": "活躍用戶 (僅前台)",
   "Active Users (Foreground + Background)": "活躍用戶 (前台+後台)",
   "Foreground only": "僅前台",
-  "Users with at least one foreground ping": "至少一次前台運行的用戶",
+  "Users with at least one foreground ping": "新版本 至少打开一次 的用戶數量",
   "Background only": "僅後台",
-  "Users with strictly background pings only": "僅在後台運行的用戶",
+  "Users with strictly background pings only": "新版本 在後台運行 但並未打開 的用戶數量",
   "Non-applicable": "不適用",
   "Users using legacy app clients": "使用舊版客戶端的用戶",
   "Classification Definitions:": "分類定義說明:",
@@ -145,10 +145,17 @@ const translations = {
   "Avg Daily Download / User": "平均用戶單日接收",
   "Avg Upload / User (Period)": "平均用戶發送 (所選期間)",
   "Avg Download / User (Period)": "平均用戶接收 (所選期間)",
+  "Avg Upload / User (Period) (Excl. Top 10)": "平均用戶發送 去除 Top 10 (所選期間)",
+  "Avg Download / User (Period) (Excl. Top 10)": "平均用戶接收 去除 Top 10 (所選期間)",
+  "Total Combined Traffic (Period)": "用戶總發送與接收 (所選期間)",
+  "Total Combined Traffic (Period) (Excl. Top 10)": "用戶總發送與接收 去除 Top 10 (所選期間)",
+  "Estimated Cost": "預估流量費用",
+  "out of {count} members": "共 {count} 位成員",
   "Top 20 Users by Traffic": "前 20 名流量用戶",
   "Traffic": "流量",
+  "Cost": "費用",
   "Usage Days": "使用天數",
-  
+
   // Timeframes
   "Latest Ping": "最新 Ping",
   "Last 15 Mins": "過去 15 分鐘",
@@ -157,7 +164,7 @@ const translations = {
   "Yesterday": "昨天",
   "This Week": "本週",
   "All Time": "歷史總計",
-  
+
   // General / Misc
   "Loading...": "加載中...",
   "Unknown": "未知",
@@ -181,7 +188,7 @@ const translations = {
   "Updating...": "更新中...",
   "Failed to load user list": "加載用戶列表失敗",
   "You do not have permission to view users.": "您沒有查看用戶的權限。",
-  
+
   // Traffic Report
   "Traffic Report": "流量報告",
   "All Users": "所有用戶",

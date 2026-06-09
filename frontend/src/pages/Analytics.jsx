@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { BarChart3, Users, Download, Upload, Clock, Info } from 'lucide-react';
+import { BarChart3, Users, Download, Upload, Clock, Info, ArrowUpDown } from 'lucide-react';
 
 export const formatBytes = (bytes) => {
   if (bytes === 0 || !bytes) return '0 B';
@@ -9,6 +9,22 @@ export const formatBytes = (bytes) => {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+export const formatTrafficWithCost = (bytes) => {
+  if (bytes === undefined || bytes === null) return '0 B ($0.00)';
+  const formattedTraffic = formatBytes(bytes);
+  const tb = bytes / (1024 * 1024 * 1024 * 1024);
+  const cost = tb * 90;
+  const formattedCost = cost === 0 ? '$0.00' : (cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`);
+  return `${formattedTraffic} (${formattedCost})`;
+};
+
+export const calculateCostOnly = (bytes) => {
+  if (bytes === undefined || bytes === null) return '$0.00';
+  const tb = bytes / (1024 * 1024 * 1024 * 1024);
+  const cost = tb * 90;
+  return cost === 0 ? '$0.00' : (cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`);
 };
 
 const Analytics = () => {
@@ -61,14 +77,14 @@ const Analytics = () => {
 
   return (
     <div>
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="card" style={{ padding: '12px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h2 className="card-title" style={{ margin: 0 }}>
               <BarChart3 size={20} color="#3498db" />
               {t('Network Statistics')}
             </h2>
-            <span className="badge badge-info" style={{ padding: '6px 12px', fontSize: '12px' }}>
+            <span className="badge badge-info" style={{ padding: '4px 10px', fontSize: '11px' }}>
               {getTimeRangeText()}
             </span>
           </div>
@@ -78,7 +94,7 @@ const Analytics = () => {
               value={timeframe} 
               onChange={(e) => setTimeframe(e.target.value)} 
               className="form-control"
-              style={{ width: 'auto', padding: '6px 12px' }}
+              style={{ width: 'auto', padding: '4px 10px' }}
             >
               <option value="last_15_mins">{t('Last 15 Mins')}</option>
               <option value="last_hour">{t('Last Hour')}</option>
@@ -91,121 +107,201 @@ const Analytics = () => {
         </div>
         
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
-            <span className="spinner" style={{ borderTopColor: '#3498db', width: '32px', height: '32px' }}></span>
-            <span style={{ marginTop: '16px', color: '#64748b', fontWeight: 500 }}>{t('Loading...')}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '30px 0' }}>
+            <span className="spinner" style={{ borderTopColor: '#3498db', width: '28px', height: '28px' }}></span>
+            <span style={{ marginTop: '12px', color: '#64748b', fontWeight: 500 }}>{t('Loading...')}</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* Row 1: User count period statistics */}
-            <div className="grid grid-cols-4" style={{ gap: '12px' }}>
-              <div className="card" style={{ borderLeft: '4px solid #2ecc71', margin: 0, padding: '12px 14px' }}>
+            <div className="grid grid-cols-4" style={{ gap: '8px' }}>
+              <div className="card" style={{ borderLeft: '4px solid #2ecc71', margin: 0, padding: '8px 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
                       {data?.dailyActiveUsersForeground ?? 0}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
                       {t('Users with at least one foreground ping')}
                     </div>
                   </div>
-                  <Users size={16} color="#2ecc71" />
+                  <Users size={14} color="#2ecc71" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #3498db', margin: 0, padding: '12px 14px' }}>
+              <div className="card" style={{ borderLeft: '4px solid #3498db', margin: 0, padding: '8px 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
                       {data?.dailyActiveUsersBackground ?? 0}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
                       {t('Users with strictly background pings only')}
                     </div>
                   </div>
-                  <Users size={16} color="#3498db" />
+                  <Users size={14} color="#3498db" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '12px 14px' }}>
+              <div className="card" style={{ borderLeft: '4px solid #e74c3c', margin: 0, padding: '8px 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
                       {data?.dailyActiveUsersNotApplicable ?? 0}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
                       {t('Users using legacy app clients')}
                     </div>
                   </div>
-                  <Users size={16} color="#f39c12" />
+                  <Users size={14} color="#e74c3c" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #95a5a6', margin: 0, padding: '12px 14px' }}>
+              <div className="card" style={{ borderLeft: '4px solid #95a5a6', margin: 0, padding: '8px 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
                       {data?.dailyNewUsers ?? 0}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
                       {t('New Users (Period)')}
                     </div>
                   </div>
-                  <Users size={16} color="#95a5a6" />
+                  <Users size={14} color="#95a5a6" />
                 </div>
               </div>
             </div>
 
-            {/* Row 2: Traffic period statistics */}
-            <div className="grid grid-cols-2" style={{ gap: '12px' }}>
-              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '12px 14px' }}>
+            {/* Row 2: Average Traffic period statistics */}
+            <div className="grid grid-cols-4" style={{ gap: '8px' }}>
+              {/* Avg Upload */}
+              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '8px 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
                       {formatBytes(data?.avgDailySent)}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
                       {t('Avg Upload / User (Period)')}
+                      <span style={{ display: 'block', fontSize: '9px', fontWeight: 500, color: '#64748b', textTransform: 'none', marginTop: '1px' }}>
+                        {t('out of {count} members').replace('{count}', data?.dailyActiveUsers ?? 0)}
+                      </span>
                     </div>
                   </div>
-                  <Upload size={16} color="#f39c12" />
+                  <Upload size={14} color="#f39c12" />
                 </div>
               </div>
 
-              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '12px 14px' }}>
+              {/* Avg Upload Excluding Top 10 */}
+              <div className="card" style={{ borderLeft: '4px solid #9b59b6', margin: 0, padding: '8px 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
-                      {formatBytes(data?.avgDailyReceived)}
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      {formatBytes(data?.avgDailySentExcludingTop10)}
                     </div>
-                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                      {t('Avg Download / User (Period)')}
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                      {t('Avg Upload / User (Period) (Excl. Top 10)')}
+                      <span style={{ display: 'block', fontSize: '9px', fontWeight: 500, color: '#64748b', textTransform: 'none', marginTop: '1px' }}>
+                        {t('out of {count} members').replace('{count}', data?.dailyActiveUsersExcludingTop10 ?? 0)}
+                      </span>
                     </div>
                   </div>
-                  <Download size={16} color="#f39c12" />
+                  <Upload size={14} color="#9b59b6" />
+                </div>
+              </div>
+
+              {/* Avg Download */}
+              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      {formatBytes(data?.avgDailyReceived)}
+                    </div>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                      {t('Avg Download / User (Period)')}
+                      <span style={{ display: 'block', fontSize: '9px', fontWeight: 500, color: '#64748b', textTransform: 'none', marginTop: '1px' }}>
+                        {t('out of {count} members').replace('{count}', data?.dailyActiveUsers ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                  <Download size={14} color="#f39c12" />
+                </div>
+              </div>
+
+              {/* Avg Download Excluding Top 10 */}
+              <div className="card" style={{ borderLeft: '4px solid #9b59b6', margin: 0, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      {formatBytes(data?.avgDailyReceivedExcludingTop10)}
+                    </div>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                      {t('Avg Download / User (Period) (Excl. Top 10)')}
+                      <span style={{ display: 'block', fontSize: '9px', fontWeight: 500, color: '#64748b', textTransform: 'none', marginTop: '1px' }}>
+                        {t('out of {count} members').replace('{count}', data?.dailyActiveUsersExcludingTop10 ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                  <Download size={14} color="#9b59b6" />
                 </div>
               </div>
             </div>
 
-            {/* Row 3: All-time Total Users at the absolute bottom */}
-            <div className="card" style={{ borderLeft: '4px solid #3498db', margin: 0, padding: '12px 14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
-                    {data?.totalUsers ?? 0}
+            {/* Section: Traffic Cost Statistics */}
+            <div style={{ marginTop: '2px', marginBottom: '2px', borderTop: '1px solid #f1f5f9', paddingTop: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {t('Estimated Cost')}
+                </span>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+                  (90USD / TB)
+                </span>
+              </div>
+            </div>
+
+            {/* Row 3: Traffic cost period statistics */}
+            <div className="grid grid-cols-2" style={{ gap: '8px' }}>
+              {/* Total Combined */}
+              <div className="card" style={{ borderLeft: '4px solid #f39c12', margin: 0, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      {formatTrafficWithCost(data?.totalDailyCombined ?? ((data?.avgDailySent ?? 0) * (data?.dailyActiveUsers ?? 0) + (data?.avgDailyReceived ?? 0) * (data?.dailyActiveUsers ?? 0)))}
+                    </div>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                      {t('Total Combined Traffic (Period)')}
+                      <span style={{ display: 'block', fontSize: '9px', fontWeight: 500, color: '#64748b', textTransform: 'none', marginTop: '1px' }}>
+                        {t('out of {count} members').replace('{count}', data?.dailyActiveUsers ?? 0)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '10px' }}>
-                    {t('Total Users (All-time)')}
-                  </div>
+                  <ArrowUpDown size={14} color="#f39c12" />
                 </div>
-                <Users size={16} color="#3498db" />
+              </div>
+
+              {/* Total Combined Excluding Top 10 */}
+              <div className="card" style={{ borderLeft: '4px solid #9b59b6', margin: 0, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2980b9', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      {formatTrafficWithCost(data?.totalDailyCombinedExcludingTop10 ?? ((data?.avgDailySentExcludingTop10 ?? 0) * (data?.dailyActiveUsersExcludingTop10 ?? 0) + (data?.avgDailyReceivedExcludingTop10 ?? 0) * (data?.dailyActiveUsersExcludingTop10 ?? 0)))}
+                    </div>
+                    <div className="card-subtitle" style={{ margin: 0, fontWeight: 600, textTransform: 'uppercase', fontSize: '9px' }}>
+                      {t('Total Combined Traffic (Period) (Excl. Top 10)')}
+                      <span style={{ display: 'block', fontSize: '9px', fontWeight: 500, color: '#64748b', textTransform: 'none', marginTop: '1px' }}>
+                        {t('out of {count} members').replace('{count}', data?.dailyActiveUsersExcludingTop10 ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowUpDown size={14} color="#9b59b6" />
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="card">
+      <div className="card" style={{ padding: '12px', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}>
           <h2 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <Clock size={20} color="#3498db" />
@@ -226,19 +322,20 @@ const Analytics = () => {
               <tr>
                 <th>{t('User')}</th>
                 <th>{t('Traffic')}</th>
+                <th>{t('Cost')}</th>
                 <th>{t('Usage Days')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="3" style={{ textAlign: 'center', padding: '24px' }}>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '24px' }}>
                     <span className="spinner" style={{ borderTopColor: '#3498db', width: '20px', height: '20px' }}></span>
                   </td>
                 </tr>
               ) : !data?.topUsers || data.topUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="3" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
                     {t('No user data available yet.')}
                   </td>
                 </tr>
@@ -262,6 +359,9 @@ const Analytics = () => {
                     </td>
                     <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#2980b9' }}>
                       {formatBytes(user.total_traffic)}
+                    </td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 600, color: '#e74c3c' }}>
+                      {calculateCostOnly(user.total_traffic)}
                     </td>
                     <td style={{ color: '#475569', fontWeight: 500 }}>
                       {user.usage_days}

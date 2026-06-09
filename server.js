@@ -1737,6 +1737,25 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     const avgTotalReceived = totalUsers ? (sumTotalReceived / totalUsers) : 0;
     const avgDailySent = dailyActiveUsers ? (sumDailySent / dailyActiveUsers) : 0;
     const avgDailyReceived = dailyActiveUsers ? (sumDailyReceived / dailyActiveUsers) : 0;
+
+    // Calculate stats excluding the top 10 highest usage users
+    const sortedPeriodStats = [...periodStatsRaw].sort((a, b) => {
+      const usageA = (a.today_sent || 0) + (a.today_received || 0);
+      const usageB = (b.today_sent || 0) + (b.today_received || 0);
+      return usageB - usageA;
+    });
+
+    const remainingStatsExcludingTop10 = sortedPeriodStats.slice(10);
+    let sumDailySentExcludingTop10 = 0;
+    let sumDailyReceivedExcludingTop10 = 0;
+    remainingStatsExcludingTop10.forEach(userStat => {
+      sumDailySentExcludingTop10 += userStat.today_sent || 0;
+      sumDailyReceivedExcludingTop10 += userStat.today_received || 0;
+    });
+
+    const dailyActiveUsersExcludingTop10 = remainingStatsExcludingTop10.length;
+    const avgDailySentExcludingTop10 = dailyActiveUsersExcludingTop10 ? (sumDailySentExcludingTop10 / dailyActiveUsersExcludingTop10) : 0;
+    const avgDailyReceivedExcludingTop10 = dailyActiveUsersExcludingTop10 ? (sumDailyReceivedExcludingTop10 / dailyActiveUsersExcludingTop10) : 0;
     
     let periodUserTraffic = [];
     if (timeframe === 'all_time') {
@@ -1769,7 +1788,7 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
            usageDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
        }
        return { ...tu, usage_days: usageDays || 1 };
-    });
+     });
     
     res.json({
       dailyActiveUsers,
@@ -1783,6 +1802,13 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
       avgTotalReceived,
       avgDailySent,
       avgDailyReceived,
+      avgDailySentExcludingTop10,
+      avgDailyReceivedExcludingTop10,
+      avgDailyCombined: avgDailySent + avgDailyReceived,
+      avgDailyCombinedExcludingTop10: avgDailySentExcludingTop10 + avgDailyReceivedExcludingTop10,
+      totalDailyCombined: sumDailySent + sumDailyReceived,
+      totalDailyCombinedExcludingTop10: sumDailySentExcludingTop10 + sumDailyReceivedExcludingTop10,
+      dailyActiveUsersExcludingTop10,
       topUsers,
       timeRangeText
     });
