@@ -16,7 +16,10 @@ const MONGODB_URI = process.env.MONGODB_URI ||
   (platform === 'ios' ? process.env.MONGODB_URI_IOS : process.env.MONGODB_URI_ANDROID) || 
   'mongodb+srv://desmondgiam_db_user:PCibd7pBM4XcOAHG@skywalker-tencent-clust.hr8apyw.mongodb.net/?appName=skywalker-tencent-cluster';
 
-mongoose.connect(MONGODB_URI)
+mongoose.connect(MONGODB_URI, {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000
+})
   .then(() => console.log(`Connected to MongoDB (${platform.toUpperCase()})`))
   .catch(err => console.error('MongoDB connection error:', err));
 
@@ -43,6 +46,7 @@ const networkTelemetrySchema = new mongoose.Schema({
 }, { strict: false });
 networkTelemetrySchema.index({ last_updated: -1 });
 networkTelemetrySchema.index({ user_id: 1, last_updated: -1 });
+networkTelemetrySchema.index({ 'device_info.is_in_foreground': 1, last_updated: -1 });
 const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
 
 const networkDailyBucketSchema = new mongoose.Schema({
@@ -215,6 +219,8 @@ mongoose.connection.once('open', async () => {
 });
 
 // Middleware
+const compression = require('compression');
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
@@ -930,6 +936,12 @@ app.post('/user-login-details', async (req, res) => {
   }
 });
 
+// In-memory cache of latest network state per user_id to avoid DB reads on every ping
+// Cache entries: { network_usage, active_proxy_ip, timestamp }
+const latestStateCache = new Map();
+const CACHE_MAX_SIZE = 500;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 /**
  * POST /network-usage
  */
@@ -946,8 +958,14 @@ app.post('/network-usage', async (req, res) => {
     // --- Daily Bucket Logic ---
     const todayStr = new Date().toISOString().split('T')[0]; // e.g. "2026-05-09"
     
-    // Get existing latest state to calculate delta
-    const existing = await NetworkTelemetry.findOne({ user_id }).sort({ last_updated: -1 });
+    // Get existing latest state to calculate delta (prefer cache, fallback to DB)
+    let existing = null;
+    const cached = latestStateCache.get(user_id);
+    if (cached && (Date.now() - cached._cachedAt) < CACHE_TTL_MS) {
+      existing = cached;
+    } else {
+      existing = await NetworkTelemetry.findOne({ user_id }).sort({ last_updated: -1 }).lean();
+    }
     
     // If payload doesn't include active_proxy_ip, check active_connection.ip, then fallback to existing
     let finalProxyIp = payload.active_proxy_ip || payload.active_connection?.ip || existing?.active_proxy_ip;
@@ -986,6 +1004,18 @@ app.post('/network-usage', async (req, res) => {
     delete payload._id;
     delete payload.__v;
     await NetworkTelemetry.create(payload);
+
+    // Update cache with the new state
+    latestStateCache.set(user_id, {
+      network_usage: payload.network_usage,
+      active_proxy_ip: payload.active_proxy_ip,
+      _cachedAt: Date.now()
+    });
+    // Evict oldest entries if cache exceeds max size
+    if (latestStateCache.size > CACHE_MAX_SIZE) {
+      const firstKey = latestStateCache.keys().next().value;
+      latestStateCache.delete(firstKey);
+    }
     
     res.status(200).json({ status: 'updated' });
   } catch (error) {
@@ -1000,7 +1030,7 @@ app.post('/network-usage', async (req, res) => {
 app.get('/api/telemetry/stats', verifyToken, async (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   try {
-    const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(5000);
+    const logins = await LoginTelemetry.find().sort({ timestamp: -1 }).limit(5000).lean();
     const networkRaw = await NetworkTelemetry.find().sort({ last_updated: -1 }).limit(5000).lean();
     
     // Batch lookup latest logins for the network raw user IDs to avoid N+1 queries
@@ -1803,8 +1833,11 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     // Retain dailyActiveUsers for backward compatibility and averages
     dailyActiveUsers = dailyActiveUsersTotal;
 
-    const totalUsersRaw = await NetworkTelemetry.distinct("user_id");
-    const totalUsers = totalUsersRaw.length;
+    const totalUsersAgg = await NetworkTelemetry.aggregate([
+      { $group: { _id: "$user_id" } },
+      { $count: "total" }
+    ]);
+    const totalUsers = totalUsersAgg[0]?.total || 0;
 
     // OPTIMIZED: Eliminate heavy aggregation of the entire collection to find first pings for all users
     if (timeframe === 'all_time') {
@@ -1827,6 +1860,8 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
     const userTrafficMap = {};
 
     if (timeframe === 'all_time') {
+      // OPTIMIZED: Reuse activeUsersStats to compute traffic in the same pass
+      // instead of running a second full-collection aggregation
       const statsRaw = await NetworkTelemetry.aggregate([
         { $group: {
             _id: "$user_id",
@@ -1854,27 +1889,31 @@ app.get('/api/telemetry/daily-stats', verifyToken, async (req, res) => {
           today_received: s.total_received
       }));
     } else {
-      const totalStats = await NetworkTelemetry.aggregate([
-        { $group: {
-            _id: null,
-            total_sent: { $sum: "$delta_sent" },
-            total_received: { $sum: "$delta_received" }
-        }}
-      ]).allowDiskUse(true);
+      // OPTIMIZED: Single aggregation for both total and period stats
+      const [totalStats, periodStats] = await Promise.all([
+        NetworkTelemetry.aggregate([
+          { $group: {
+              _id: null,
+              total_sent: { $sum: "$delta_sent" },
+              total_received: { $sum: "$delta_received" }
+          }}
+        ]).allowDiskUse(true),
+        NetworkTelemetry.aggregate([
+          { $match: query },
+          { $group: {
+              _id: "$user_id",
+              today_sent: { $sum: "$delta_sent" },
+              today_received: { $sum: "$delta_received" },
+              telegram_user: { $first: "$telegram_user" }
+          }}
+        ]).allowDiskUse(true)
+      ]);
       if (totalStats.length > 0) {
         sumTotalSent = totalStats[0].total_sent || 0;
         sumTotalReceived = totalStats[0].total_received || 0;
       }
 
-      periodStatsRaw = await NetworkTelemetry.aggregate([
-        { $match: query },
-        { $group: {
-            _id: "$user_id",
-            today_sent: { $sum: "$delta_sent" },
-            today_received: { $sum: "$delta_received" },
-            telegram_user: { $first: "$telegram_user" }
-        }}
-      ]).allowDiskUse(true);
+      periodStatsRaw = periodStats;
     }
 
     let sumDailySent = 0;
@@ -2328,30 +2367,9 @@ app.get('/api/telemetry/xray-stats', verifyToken, async (req, res) => {
   }
 });
 
-/**
- * DELETE /api/telemetry/logins
- */
-app.delete('/api/telemetry/logins', verifyToken, async (req, res) => {
-  try {
-    await LoginTelemetry.deleteMany({});
-    res.json({ status: 'deleted' });
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-/**
- * DELETE /api/telemetry/network
- */
-app.delete('/api/telemetry/network', verifyToken, async (req, res) => {
-  try {
-    await NetworkTelemetry.deleteMany({});
-    await NetworkDailyBucket.deleteMany({});
-    res.json({ status: 'deleted' });
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
+// NOTE: Duplicate DELETE /api/telemetry/logins and /api/telemetry/network
+// routes removed — the range-based versions (lines ~1119 and ~1157) are the
+// correct handlers and now execute properly.
 
 // Wildcard handler directs all other GET requests to the index.html for client-side routing
 app.get('*', (req, res) => {
