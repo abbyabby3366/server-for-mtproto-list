@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  Sliders, 
-  Globe, 
-  Network, 
-  Plus, 
-  Trash2, 
-  Save, 
-  Edit3,
-  CheckCircle,
-  XCircle,
-  History,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+
+// Import modular subcomponents
+import AndroidVersionConfigCard from '../components/Configs/AndroidVersionConfigCard';
+import IosVersionConfigCard from '../components/Configs/IosVersionConfigCard';
+import ExternalRedirectsCard from '../components/Configs/ExternalRedirectsCard';
+import XrayNodeIpsCard from '../components/Configs/XrayNodeIpsCard';
+import MtProxiesCard from '../components/Configs/MtProxiesCard';
 
 const Configs = () => {
   const { authFetch } = useAuth();
@@ -363,15 +356,6 @@ const Configs = () => {
     };
 
     try {
-      const res = await authFetch('/api/external-redirect-urls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      // Wait, in server.js we saw the endpoint is POST /api/external-redirects
-      // Let's verify the endpoint name: it's app.post('/api/external-redirects', verifyToken, async (req, res) => { ... })
-      // Ah! Yes, it's '/api/external-redirects'! Let's make sure we call '/api/external-redirects'.
       const actualRes = await authFetch('/api/external-redirects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -503,8 +487,6 @@ const Configs = () => {
     }
   };
 
-
-
   // Helper notification timer
   const showNotification = (setter, message, type) => {
     setter({ message, type });
@@ -526,944 +508,111 @@ const Configs = () => {
       
       {/* 1. APP VERSION CONFIGURATIONS */}
       {platform === 'android' ? (
-        /* ANDROID VERSION CONFIG */
-        <div className="card" style={{ marginBottom: 0 }}>
-          <h2 className="card-title">
-            <Sliders size={20} color="#3498db" />
-            {t('App Version Configuration (Android)')}
-          </h2>
-          <p className="card-subtitle">{t('Configure update metrics served at /api/android/version')}</p>
-          
-          <form onSubmit={handleAndroidVersionSubmit}>
-            <div className="grid grid-cols-2" style={{ gap: '16px' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label htmlFor="androidVersionCode">{t('Version Code')}</label>
-                <input
-                  type="number"
-                  id="androidVersionCode"
-                  className="form-control"
-                  placeholder="e.g. 6514"
-                  value={androidVersionCode}
-                  onChange={(e) => setAndroidVersionCode(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div className="form-group" style={{ margin: 0 }}>
-                <label htmlFor="androidVersionName">{t('Version Name')}</label>
-                <input
-                  type="text"
-                  id="androidVersionName"
-                  className="form-control"
-                  placeholder="e.g. 12.4.5"
-                  value={androidVersionName}
-                  onChange={(e) => setAndroidVersionName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '16px' }}>
-              <label htmlFor="androidDownloadUrl">{t('Download URL')}</label>
-              <input
-                type="text"
-                id="androidDownloadUrl"
-                className="form-control"
-                placeholder="https://..."
-                value={androidDownloadUrl}
-                onChange={(e) => setAndroidDownloadUrl(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="androidChangelog">{t('Changelog')}</label>
-              <textarea
-                id="androidChangelog"
-                className="form-control"
-                placeholder="Enter changelog details..."
-                style={{ minHeight: '80px', resize: 'vertical' }}
-                value={androidChangelog}
-                onChange={(e) => setAndroidChangelog(e.target.value)}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-              <input
-                type="checkbox"
-                id="androidForceUpdate"
-                checked={androidForceUpdate}
-                onChange={(e) => setAndroidForceUpdate(e.target.checked)}
-                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-              />
-              <label htmlFor="androidForceUpdate" style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}>
-                {t('Require Force Update')}
-              </label>
-            </div>
-
-            <button 
-              type="submit" 
-              className="btn btn-primary" 
-              disabled={androidVersionSaving}
-            >
-              <Save size={16} />
-              {androidVersionSaving ? t('Saving...') : t('Save Configuration')}
-            </button>
-          </form>
-
-          {androidVersionNotification && (
-            <div className={`notification notification-${androidVersionNotification.type}`}>
-              {androidVersionNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              <span>{androidVersionNotification.message}</span>
-            </div>
-          )}
-
-          {/* Android Version Change History Panel */}
-          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
-            <button 
-              type="button" 
-              onClick={() => {
-                setAndroidVersionLogsExpanded(!androidVersionLogsExpanded);
-                if (!androidVersionLogsExpanded && androidVersionLogs.length === 0) fetchAndroidVersionLogs();
-              }}
-              className="btn btn-outline" 
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                backgroundColor: 'transparent', 
-                color: '#3498db', 
-                border: '1px solid #3498db',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                cursor: 'pointer',
-                fontWeight: 500,
-                fontSize: '13px',
-                transition: 'all 0.2s'
-              }}
-            >
-              <History size={14} />
-              {androidVersionLogsExpanded ? t('Hide Change History') : t('View Change History')}
-            </button>
-
-            {androidVersionLogsExpanded && (
-              <div style={{ marginTop: '16px' }}>
-                {androidVersionLogsLoading ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-                    <span className="spinner" style={{ borderTopColor: '#3498db', width: '20px', height: '20px' }}></span>
-                  </div>
-                ) : androidVersionLogs.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '8px 0 0 0' }}>
-                    {t('No change logs recorded yet.')}
-                  </p>
-                ) : (
-                  <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '12px' }}>
-                    <table style={{ fontSize: '13px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ width: '150px' }}>{t('Time & Operator')}</th>
-                          <th>{t('Changed Fields')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {androidVersionLogs.map((log) => (
-                          <tr key={log._id}>
-                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                {new Date(log.timestamp).toLocaleString()}
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                by <span style={{ fontWeight: 500, color: '#3498db' }}>{log.user?.username}</span>
-                                <span className="badge badge-info" style={{ marginLeft: '4px', fontSize: '9px', padding: '2px 4px' }}>
-                                  {log.user?.role}
-                                </span>
-                              </div>
-                            </td>
-                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                              {log.previousConfig ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <table style={{ border: '1px solid #e2e8f0', width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Parameter')}</th>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Previous Value')}</th>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('New Value')}</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'].map((field) => {
-                                        const isChanged = log.changedFields?.includes(field);
-                                        const prevVal = String(log.previousConfig[field]);
-                                        const newVal = String(log.newConfig[field]);
-                                        return (
-                                          <tr key={field} style={{ 
-                                            borderBottom: '1px solid #e2e8f0',
-                                            backgroundColor: isChanged ? '#fffbeb' : 'transparent',
-                                            transition: 'background-color 0.2s'
-                                          }}>
-                                            <td style={{ padding: '6px', fontWeight: 500, color: isChanged ? '#d97706' : 'inherit' }}>
-                                              {t(field)}
-                                            </td>
-                                            <td style={{ 
-                                              padding: '6px', 
-                                              color: isChanged ? '#d97706' : 'var(--text-muted)',
-                                              textDecoration: isChanged ? 'line-through' : 'none',
-                                              wordBreak: 'break-all'
-                                            }}>
-                                              {field === 'forceUpdate' ? (log.previousConfig[field] ? t('Yes') : t('No')) : prevVal || '-'}
-                                            </td>
-                                            <td style={{ 
-                                              padding: '6px', 
-                                              fontWeight: isChanged ? 600 : 'normal',
-                                              color: isChanged ? '#b45309' : 'var(--text-main)',
-                                              wordBreak: 'break-all'
-                                            }}>
-                                              {field === 'forceUpdate' ? (log.newConfig[field] ? t('Yes') : t('No')) : newVal || '-'}
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              ) : (
-                                <div>
-                                  <span className="badge badge-success">{t('Initial Configuration')}</span>
-                                  <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                                    <strong>{t('Code')}:</strong> {log.newConfig?.versionCode} | <strong>{t('Name')}:</strong> {log.newConfig?.versionName}
-                                  </div>
-                                  <div style={{ fontSize: '12px', wordBreak: 'break-all' }}>
-                                    <strong>{t('URL')}:</strong> {log.newConfig?.downloadUrl}
-                                  </div>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <AndroidVersionConfigCard
+          androidVersionCode={androidVersionCode}
+          setAndroidVersionCode={setAndroidVersionCode}
+          androidVersionName={androidVersionName}
+          setAndroidVersionName={setAndroidVersionName}
+          androidDownloadUrl={androidDownloadUrl}
+          setAndroidDownloadUrl={setAndroidDownloadUrl}
+          androidChangelog={androidChangelog}
+          setAndroidChangelog={setAndroidChangelog}
+          androidForceUpdate={androidForceUpdate}
+          setAndroidForceUpdate={setAndroidForceUpdate}
+          androidVersionSaving={androidVersionSaving}
+          androidVersionNotification={androidVersionNotification}
+          androidVersionLogsExpanded={androidVersionLogsExpanded}
+          setAndroidVersionLogsExpanded={setAndroidVersionLogsExpanded}
+          androidVersionLogs={androidVersionLogs}
+          androidVersionLogsLoading={androidVersionLogsLoading}
+          fetchAndroidVersionLogs={fetchAndroidVersionLogs}
+          handleAndroidVersionSubmit={handleAndroidVersionSubmit}
+          t={t}
+        />
       ) : (
-        /* IOS VERSION CONFIG */
-        <div className="card" style={{ marginBottom: 0 }}>
-          <h2 className="card-title">
-            <Sliders size={20} color="#007aff" />
-            {t('App Version Configuration (iOS)')}
-          </h2>
-          <p className="card-subtitle">{t('Configure update metrics served at /api/ios/version')}</p>
-          
-          <form onSubmit={handleIosVersionSubmit}>
-            <div className="grid grid-cols-2" style={{ gap: '16px' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label htmlFor="iosVersionCode">{t('Version Code')}</label>
-                <input
-                  type="number"
-                  id="iosVersionCode"
-                  className="form-control"
-                  placeholder="e.g. 120"
-                  value={iosVersionCode}
-                  onChange={(e) => setIosVersionCode(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div className="form-group" style={{ margin: 0 }}>
-                <label htmlFor="iosVersionName">{t('Version Name')}</label>
-                <input
-                  type="text"
-                  id="iosVersionName"
-                  className="form-control"
-                  placeholder="e.g. 1.2.0"
-                  value={iosVersionName}
-                  onChange={(e) => setIosVersionName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '16px' }}>
-              <label htmlFor="iosDownloadUrl">{t('Download URL')}</label>
-              <input
-                type="text"
-                id="iosDownloadUrl"
-                className="form-control"
-                placeholder="https://apps.apple.com/app/id..."
-                value={iosDownloadUrl}
-                onChange={(e) => setIosDownloadUrl(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="iosChangelog">{t('Changelog')}</label>
-              <textarea
-                id="iosChangelog"
-                className="form-control"
-                placeholder="Enter changelog details..."
-                style={{ minHeight: '80px', resize: 'vertical' }}
-                value={iosChangelog}
-                onChange={(e) => setIosChangelog(e.target.value)}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-              <input
-                type="checkbox"
-                id="iosForceUpdate"
-                checked={iosForceUpdate}
-                onChange={(e) => setIosForceUpdate(e.target.checked)}
-                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-              />
-              <label htmlFor="iosForceUpdate" style={{ cursor: 'pointer', fontWeight: 500, userSelect: 'none' }}>
-                {t('Require Force Update')}
-              </label>
-            </div>
-
-            <button 
-              type="submit" 
-              className="btn btn-primary" 
-              disabled={iosVersionSaving}
-              style={{ backgroundColor: '#007aff' }}
-            >
-              <Save size={16} />
-              {iosVersionSaving ? t('Saving...') : t('Save Configuration')}
-            </button>
-          </form>
-
-          {iosVersionNotification && (
-            <div className={`notification notification-${iosVersionNotification.type}`}>
-              {iosVersionNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              <span>{iosVersionNotification.message}</span>
-            </div>
-          )}
-
-          {/* iOS Version Change History Panel */}
-          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
-            <button 
-              type="button" 
-              onClick={() => {
-                setIosVersionLogsExpanded(!iosVersionLogsExpanded);
-                if (!iosVersionLogsExpanded && iosVersionLogs.length === 0) fetchIosVersionLogs();
-              }}
-              className="btn btn-outline" 
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                backgroundColor: 'transparent', 
-                color: '#007aff', 
-                border: '1px solid #007aff',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                cursor: 'pointer',
-                fontWeight: 500,
-                fontSize: '13px',
-                transition: 'all 0.2s'
-              }}
-            >
-              <History size={14} />
-              {iosVersionLogsExpanded ? t('Hide Change History') : t('View Change History')}
-            </button>
-
-            {iosVersionLogsExpanded && (
-              <div style={{ marginTop: '16px' }}>
-                {iosVersionLogsLoading ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-                    <span className="spinner" style={{ borderTopColor: '#007aff', width: '20px', height: '20px' }}></span>
-                  </div>
-                ) : iosVersionLogs.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '8px 0 0 0' }}>
-                    {t('No change logs recorded yet.')}
-                  </p>
-                ) : (
-                  <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '12px' }}>
-                    <table style={{ fontSize: '13px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ width: '150px' }}>{t('Time & Operator')}</th>
-                          <th>{t('Changed Fields')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {iosVersionLogs.map((log) => (
-                          <tr key={log._id}>
-                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                                {new Date(log.timestamp).toLocaleString()}
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                by <span style={{ fontWeight: 500, color: '#007aff' }}>{log.user?.username}</span>
-                                <span className="badge badge-info" style={{ marginLeft: '4px', fontSize: '9px', padding: '2px 4px', backgroundColor: '#e0f2fe', color: '#007aff' }}>
-                                  {log.user?.role}
-                                </span>
-                              </div>
-                            </td>
-                            <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                              {log.previousConfig ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <table style={{ border: '1px solid #e2e8f0', width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Parameter')}</th>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('Previous Value')}</th>
-                                        <th style={{ padding: '6px', textAlign: 'left', fontWeight: 600 }}>{t('New Value')}</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {['versionCode', 'versionName', 'downloadUrl', 'changelog', 'forceUpdate'].map((field) => {
-                                        const isChanged = log.changedFields?.includes(field);
-                                        const prevVal = String(log.previousConfig[field]);
-                                        const newVal = String(log.newConfig[field]);
-                                        return (
-                                          <tr key={field} style={{ 
-                                            borderBottom: '1px solid #e2e8f0',
-                                            backgroundColor: isChanged ? '#fffbeb' : 'transparent',
-                                            transition: 'background-color 0.2s'
-                                          }}>
-                                            <td style={{ padding: '6px', fontWeight: 500, color: isChanged ? '#d97706' : 'inherit' }}>
-                                              {t(field)}
-                                            </td>
-                                            <td style={{ 
-                                              padding: '6px', 
-                                              color: isChanged ? '#d97706' : 'var(--text-muted)',
-                                              textDecoration: isChanged ? 'line-through' : 'none',
-                                              wordBreak: 'break-all'
-                                            }}>
-                                              {field === 'forceUpdate' ? (log.previousConfig[field] ? t('Yes') : t('No')) : prevVal || '-'}
-                                            </td>
-                                            <td style={{ 
-                                              padding: '6px', 
-                                              fontWeight: isChanged ? 600 : 'normal',
-                                              color: isChanged ? '#b45309' : 'var(--text-main)',
-                                              wordBreak: 'break-all'
-                                            }}>
-                                              {field === 'forceUpdate' ? (log.newConfig[field] ? t('Yes') : t('No')) : newVal || '-'}
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              ) : (
-                                <div>
-                                  <span className="badge badge-success">{t('Initial Configuration')}</span>
-                                  <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                                    <strong>{t('Code')}:</strong> {log.newConfig?.versionCode} | <strong>{t('Name')}:</strong> {log.newConfig?.versionName}
-                                  </div>
-                                  <div style={{ fontSize: '12px', wordBreak: 'break-all' }}>
-                                    <strong>{t('URL')}:</strong> {log.newConfig?.downloadUrl}
-                                  </div>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <IosVersionConfigCard
+          iosVersionCode={iosVersionCode}
+          setIosVersionCode={setIosVersionCode}
+          iosVersionName={iosVersionName}
+          setIosVersionName={setIosVersionName}
+          iosDownloadUrl={iosDownloadUrl}
+          setIosDownloadUrl={setIosDownloadUrl}
+          iosChangelog={iosChangelog}
+          setIosChangelog={setIosChangelog}
+          iosForceUpdate={iosForceUpdate}
+          setIosForceUpdate={setIosForceUpdate}
+          iosVersionSaving={iosVersionSaving}
+          iosVersionNotification={iosVersionNotification}
+          iosVersionLogsExpanded={iosVersionLogsExpanded}
+          setIosVersionLogsExpanded={setIosVersionLogsExpanded}
+          iosVersionLogs={iosVersionLogs}
+          iosVersionLogsLoading={iosVersionLogsLoading}
+          fetchIosVersionLogs={fetchIosVersionLogs}
+          handleIosVersionSubmit={handleIosVersionSubmit}
+          t={t}
+        />
       )}
 
       {/* 2. EXTERNAL REDIRECTS CONFIG */}
       {platform === 'android' && (
-      <div className="card" style={{ transition: 'all 0.3s ease' }}>
-        <div 
-          onClick={() => setExtRedirectsOpen(!extRedirectsOpen)}
-          style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            cursor: 'pointer',
-            userSelect: 'none'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <h2 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Globe size={20} color="#e67e22" />
-              {t('External Redirects')}
-            </h2>
-            <span 
-              className="badge" 
-              style={{ 
-                backgroundColor: '#fee2e2', 
-                color: '#ef4444', 
-                fontSize: '11px', 
-                padding: '3px 8px', 
-                fontWeight: 600,
-                border: '1px solid #fecaca',
-                marginLeft: '6px'
-              }}
-            >
-              {t('Deprecated')}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
-            {extRedirectsOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-          </div>
-        </div>
-        
-        {!extRedirectsOpen && (
-          <p className="card-subtitle" style={{ margin: '8px 0 0 0', fontStyle: 'italic', fontSize: '12px' }}>
-            {t('Click to expand this deprecated section.')}
-          </p>
-        )}
-
-        {extRedirectsOpen && (
-          <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-            <p className="card-subtitle">
-              {t('Update the APK download redirect link on external domains (e.g., talkpro.cc).')}
-            </p>
-
-        <form onSubmit={handleUpdateExternalRedirects}>
-          <div className="form-group">
-            <label htmlFor="extDownloadUrl">{t('Download URL')}</label>
-            <input
-              type="text"
-              id="extDownloadUrl"
-              className="form-control"
-              placeholder="https://..."
-              value={extDownloadUrl}
-              onChange={(e) => setExtDownloadUrl(e.target.value)}
-              readOnly={!extEditable}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="extToken">{t('Authorization Token')}</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input
-                type="text"
-                id="extToken"
-                className="form-control"
-                placeholder="Bearer token prefix..."
-                value={extToken}
-                onChange={(e) => setExtToken(e.target.value)}
-                readOnly={!extEditable}
-                required
-              />
-              <button 
-                type="button" 
-                onClick={handleExtEdit} 
-                className="btn btn-warning"
-                style={{ backgroundColor: extEditable ? '#95a5a6' : '#f39c12' }}
-              >
-                <Edit3 size={16} />
-                {extEditable ? t('Cancel') : t('Edit Config')}
-              </button>
-              {extEditable && (
-                <button 
-                  type="button" 
-                  onClick={handleSaveExtConfig} 
-                  className="btn btn-success"
-                  disabled={extConfigSaving}
-                >
-                  <Save size={16} />
-                  {extConfigSaving ? t('Saving...') : t('Save')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label style={{ fontWeight: 600 }}>{t('Domains to Update')}</label>
-            <div style={{ display: 'flex', gap: '20px', marginTop: '8px', flexWrap: 'wrap' }}>
-              {Object.keys(domains).map((domain) => (
-                <div key={domain} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <input
-                    type="checkbox"
-                    id={`domain-${domain}`}
-                    checked={domains[domain]}
-                    onChange={() => handleDomainCheckbox(domain)}
-                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                  />
-                  <label htmlFor={`domain-${domain}`} style={{ cursor: 'pointer', userSelect: 'none', fontWeight: 500 }}>
-                    {domain}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            disabled={extUpdating}
-            style={{ backgroundColor: '#e67e22' }}
-          >
-            <Globe size={16} />
-            {extUpdating ? t('Updating...') : t('Update External Redirects')}
-          </button>
-        </form>
-
-        {extNotification && (
-          <div className={`notification notification-${extNotification.type}`}>
-            {extNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span>{extNotification.message}</span>
-          </div>
-        )}
-
-        {extResults && (
-          <pre style={{ 
-            marginTop: '16px', 
-            backgroundColor: '#f8fafc', 
-            padding: '12px', 
-            borderRadius: '8px', 
-            fontSize: '12px', 
-            fontFamily: 'monospace',
-            color: '#334155',
-            border: '1px solid var(--border-color)',
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word'
-          }}>
-            {JSON.stringify(extResults, null, 2)}
-          </pre>
-        )}
-
-        {/* External Redirects Telemetry Activity Panel */}
-        <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
-          <button 
-            type="button" 
-            onClick={() => {
-              setRedirectLogsExpanded(!redirectLogsExpanded);
-              if (!redirectLogsExpanded && redirectLogs.length === 0) fetchRedirectLogs();
-            }}
-            className="btn btn-outline" 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              backgroundColor: 'transparent', 
-              color: '#e67e22', 
-              border: '1px solid #e67e22',
-              borderRadius: '6px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontWeight: 500,
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}
-          >
-            <History size={14} />
-            {redirectLogsExpanded ? t('Hide Update Activity') : t('View Update Activity')}
-          </button>
-
-          {redirectLogsExpanded && (
-            <div style={{ marginTop: '16px' }}>
-              {redirectLogsLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-                  <span className="spinner" style={{ borderTopColor: '#e67e22', width: '20px', height: '20px' }}></span>
-                </div>
-              ) : redirectLogs.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '8px 0 0 0' }}>
-                  {t('No update logs recorded yet.')}
-                </p>
-              ) : (
-                <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '12px' }}>
-                  <table style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '180px' }}>{t('Time & Operator')}</th>
-                        <th style={{ width: '250px' }}>{t('Details')}</th>
-                        <th>{t('API Query Responses')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {redirectLogs.map((log) => (
-                        <tr key={log._id}>
-                          <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                              {new Date(log.timestamp).toLocaleString()}
-                            </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              by <span style={{ fontWeight: 500, color: '#e67e22' }}>{log.user?.username}</span>
-                              <span className="badge badge-info" style={{ marginLeft: '4px', fontSize: '9px', padding: '2px 4px', backgroundColor: '#e67e22', color: 'white' }}>
-                                {log.user?.role}
-                              </span>
-                            </div>
-                          </td>
-                          <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                            <div style={{ wordBreak: 'break-all', fontSize: '12px', color: 'var(--text-muted)' }}>
-                              <strong>{t('URL')}:</strong> <span style={{ color: 'var(--text-main)' }}>{log.downloadUrl}</span>
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              <strong>{t('Token')}:</strong> <code style={{ fontSize: '11px' }}>{log.token ? (log.token.length > 12 ? `${log.token.substring(0, 8)}...${log.token.substring(log.token.length - 4)}` : log.token) : '-'}</code>
-                            </div>
-                          </td>
-                          <td style={{ verticalAlign: 'top', padding: '12px 8px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {log.results && log.results.map((res, rIdx) => {
-                                const isSuccess = res.status === 'success';
-                                return (
-                                  <div key={rIdx} style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'flex-start', 
-                                    gap: '6px',
-                                    padding: '6px 8px',
-                                    borderRadius: '4px',
-                                    backgroundColor: isSuccess ? '#f0fdf4' : '#fef2f2',
-                                    border: `1px solid ${isSuccess ? '#bbf7d0' : '#fecaca'}`,
-                                    fontSize: '12px'
-                                  }}>
-                                    <span style={{ 
-                                      color: isSuccess ? '#16a34a' : '#dc2626',
-                                      fontWeight: 'bold',
-                                      fontSize: '14px',
-                                      lineHeight: '1'
-                                    }}>
-                                      {isSuccess ? '✓' : '✗'}
-                                    </span>
-                                    <div>
-                                      <span style={{ fontWeight: 600, color: isSuccess ? '#15803d' : '#991b1b' }}>{res.domain}</span>
-                                      {!isSuccess && res.error && (
-                                        <div style={{ color: '#dc2626', fontSize: '11px', marginTop: '2px', wordBreak: 'break-all', fontFamily: 'monospace' }}>
-                                          {res.error}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-          </div>
-        )}
-      </div>
+        <ExternalRedirectsCard
+          extDownloadUrl={extDownloadUrl}
+          setExtDownloadUrl={setExtDownloadUrl}
+          extToken={extToken}
+          setExtToken={setExtToken}
+          extEditable={extEditable}
+          handleExtEdit={handleExtEdit}
+          extConfigSaving={extConfigSaving}
+          handleSaveExtConfig={handleSaveExtConfig}
+          domains={domains}
+          handleDomainCheckbox={handleDomainCheckbox}
+          extUpdating={extUpdating}
+          handleUpdateExternalRedirects={handleUpdateExternalRedirects}
+          extNotification={extNotification}
+          extResults={extResults}
+          redirectLogsExpanded={redirectLogsExpanded}
+          setRedirectLogsExpanded={setRedirectLogsExpanded}
+          redirectLogs={redirectLogs}
+          redirectLogsLoading={redirectLogsLoading}
+          fetchRedirectLogs={fetchRedirectLogs}
+          extRedirectsOpen={extRedirectsOpen}
+          setExtRedirectsOpen={setExtRedirectsOpen}
+          t={t}
+        />
       )}
 
       {/* 3. XRAY NODE IPS */}
       {platform === 'android' && (
-      <div className="card">
-        <h2 className="card-title">
-          <Network size={20} color="#2ecc71" />
-          {t('XRAY Node IPs')}
-        </h2>
-
-        {transitLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-            <span className="spinner" style={{ borderTopColor: '#2ecc71' }}></span>
-          </div>
-        ) : (
-          <div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-              {transitIps.length === 0 ? (
-                <div style={{ color: '#64748b', fontStyle: 'italic', padding: '10px 0' }}>
-                  {t('No Xray IPs configured. Click "+ Add IP Address" to get started.')}
-                </div>
-              ) : (
-                transitIps.map((ip, index) => (
-                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontWeight: 600, color: '#94a3b8', minWidth: '24px', textAlign: 'right' }}>
-                      {index + 1}.
-                    </span>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. 95.40.68.126"
-                      value={ip}
-                      onChange={(e) => handleTransitIpChange(index, e.target.value)}
-                      style={{ maxWidth: '300px' }}
-                    />
-                    <button 
-                      type="button" 
-                      onClick={() => removeTransitIpRow(index)} 
-                      className="btn btn-danger" 
-                      style={{ padding: '8px 12px' }}
-                      title="Remove"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <button 
-              type="button" 
-              onClick={addTransitIpRow} 
-              className="btn btn-success" 
-              style={{ marginBottom: '20px' }}
-            >
-              <Plus size={16} />
-              {t('+ Add IP Address')}
-            </button>
-
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginTop: '20px' }}>
-              <label 
-                htmlFor="transitRemarks" 
-                style={{ fontWeight: 600, display: 'block', fontSize: '13px', marginBottom: '8px', color: 'var(--text-main)' }}
-              >
-                {t('Remarks / Scratchpad')}
-              </label>
-              <textarea
-                id="transitRemarks"
-                className="form-control"
-                placeholder="Paste notes, older IPs, or scratchpad text here..."
-                style={{ minHeight: '80px', resize: 'vertical' }}
-                value={transitRemarks}
-                onChange={(e) => setTransitRemarks(e.target.value)}
-              />
-            </div>
-
-            <button 
-              type="button" 
-              onClick={handleTransitSubmit} 
-              className="btn btn-primary" 
-              style={{ marginTop: '20px', backgroundColor: '#2ecc71' }}
-              disabled={transitSaving}
-            >
-              <Save size={16} />
-              {transitSaving ? t('Saving...') : t('Save XRAY IPs & Remarks')}
-            </button>
-          </div>
-        )}
-
-        {transitNotification && (
-          <div className={`notification notification-${transitNotification.type}`}>
-            {transitNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span>{transitNotification.message}</span>
-          </div>
-        )}
-      </div>
+        <XrayNodeIpsCard
+          transitLoading={transitLoading}
+          transitIps={transitIps}
+          handleTransitIpChange={handleTransitIpChange}
+          removeTransitIpRow={removeTransitIpRow}
+          addTransitIpRow={addTransitIpRow}
+          transitRemarks={transitRemarks}
+          setTransitRemarks={setTransitRemarks}
+          handleTransitSubmit={handleTransitSubmit}
+          transitSaving={transitSaving}
+          transitNotification={transitNotification}
+          t={t}
+        />
       )}
 
       {/* 4. MT PROXIES */}
       {platform === 'ios' && (
-      <div className="card">
-        <h2 className="card-title">
-          <Network size={20} color="#9b59b6" />
-          {t('MT Proxies')}
-        </h2>
-
-        {proxiesLoading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-            <span className="spinner" style={{ borderTopColor: '#9b59b6' }}></span>
-          </div>
-        ) : (
-          <div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-              {proxies.length === 0 ? (
-                <div style={{ color: '#64748b', fontStyle: 'italic', padding: '10px 0' }}>
-                  {t('No MT Proxies configured. Click "+ Add Proxy" to get started.')}
-                </div>
-              ) : (
-                proxies.map((p, index) => (
-                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                    <span style={{ fontWeight: 600, color: '#94a3b8', minWidth: '24px', textAlign: 'right' }}>
-                      {index + 1}.
-                    </span>
-                    
-                    <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder={t('Host (e.g. 13.212.194.160)')}
-                        value={p.host || ''}
-                        onChange={(e) => handleProxyChange(index, 'host', e.target.value)}
-                        style={{ flex: '2 1 180px' }}
-                      />
-                      
-                      <input
-                        type="number"
-                        className="form-control"
-                        placeholder={t('Port (e.g. 443)')}
-                        value={p.port === '' ? '' : p.port}
-                        onChange={(e) => handleProxyChange(index, 'port', e.target.value)}
-                        style={{ flex: '1 1 80px', maxWidth: '100px' }}
-                      />
-                      
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder={t('Secret (hex)')}
-                        value={p.secret || ''}
-                        onChange={(e) => handleProxyChange(index, 'secret', e.target.value)}
-                        style={{ flex: '3 1 240px' }}
-                      />
-                    </div>
-
-                    <button 
-                      type="button" 
-                      onClick={() => removeProxyRow(index)} 
-                      className="btn btn-danger" 
-                      style={{ padding: '8px 12px' }}
-                      title={t('Remove')}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <button 
-              type="button" 
-              onClick={addProxyRow} 
-              className="btn btn-success" 
-              style={{ marginBottom: '20px', backgroundColor: '#9b59b6' }}
-            >
-              <Plus size={16} />
-              {t('+ Add Proxy')}
-            </button>
-
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginTop: '20px' }}>
-              <label 
-                htmlFor="proxiesRemarks" 
-                style={{ fontWeight: 600, display: 'block', fontSize: '13px', marginBottom: '8px', color: 'var(--text-main)' }}
-              >
-                {t('Remarks / Scratchpad')}
-              </label>
-              <textarea
-                id="proxiesRemarks"
-                className="form-control"
-                placeholder={t('Paste notes, backup config strings, or scratchpad text here...')}
-                style={{ minHeight: '80px', resize: 'vertical' }}
-                value={proxiesRemarks}
-                onChange={(e) => setProxiesRemarks(e.target.value)}
-              />
-            </div>
-
-            <button 
-              type="button" 
-              onClick={handleProxiesSubmit} 
-              className="btn btn-primary" 
-              style={{ marginTop: '20px', backgroundColor: '#9b59b6' }}
-              disabled={proxiesSaving}
-            >
-              <Save size={16} />
-              {proxiesSaving ? t('Saving...') : t('Save MT Proxies & Remarks')}
-            </button>
-          </div>
-        )}
-
-        {proxiesNotification && (
-          <div className={`notification notification-${proxiesNotification.type}`}>
-            {proxiesNotification.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span>{proxiesNotification.message}</span>
-          </div>
-        )}
-      </div>
+        <MtProxiesCard
+          proxiesLoading={proxiesLoading}
+          proxies={proxies}
+          handleProxyChange={handleProxyChange}
+          removeProxyRow={removeProxyRow}
+          addProxyRow={addProxyRow}
+          proxiesRemarks={proxiesRemarks}
+          setProxiesRemarks={setProxiesRemarks}
+          handleProxiesSubmit={handleProxiesSubmit}
+          proxiesSaving={proxiesSaving}
+          proxiesNotification={proxiesNotification}
+          t={t}
+        />
       )}
 
     </div>
@@ -1471,4 +620,3 @@ const Configs = () => {
 };
 
 export default Configs;
-export { Configs };
