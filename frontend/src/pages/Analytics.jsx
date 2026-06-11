@@ -5,7 +5,6 @@ import { BarChart3 } from 'lucide-react';
 
 // Import modular subcomponents
 import StatsGrid from '../components/Analytics/StatsGrid';
-import TrafficGrid from '../components/Analytics/TrafficGrid';
 import CostGrid from '../components/Analytics/CostGrid';
 import TopUsersTable from '../components/Analytics/TopUsersTable';
 
@@ -92,11 +91,6 @@ const Analytics = () => {
             <StatsGrid 
               data={data}
               timeframe={timeframe}
-              t={t}
-            />
-
-            <TrafficGrid 
-              data={data}
               t={t}
             />
 
