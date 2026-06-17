@@ -119,6 +119,22 @@ const externalRedirectConfigSchema = new mongoose.Schema({
 });
 const ExternalRedirectConfig = mongoose.model('ExternalRedirectConfig', externalRedirectConfigSchema);
 
+const userThrottleSchema = new mongoose.Schema({
+  user_id: { type: Number, required: true, unique: true },
+  throttle_enabled: { type: Boolean, default: false },
+  download_kbps: { type: Number, default: 250 },
+  upload_kbps: { type: Number, default: 250 },
+  updated_at: { type: Date, default: Date.now },
+  updated_by: { type: String, default: '' },
+  // Denormalized user info for admin display
+  first_name: { type: String, default: '' },
+  last_name: { type: String, default: '' },
+  phone_number: { type: String, default: '' },
+  username: { type: String, default: '' }
+});
+userThrottleSchema.index({ user_id: 1 }, { unique: true });
+const UserThrottle = mongoose.model('UserThrottle', userThrottleSchema);
+
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -138,5 +154,6 @@ module.exports = {
   TransitIps,
   MtProxyConfig,
   ExternalRedirectConfig,
+  UserThrottle,
   User
 };

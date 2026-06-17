@@ -3,7 +3,8 @@ const router = express.Router();
 const {
   LoginTelemetry,
   NetworkTelemetry,
-  NetworkDailyBucket
+  NetworkDailyBucket,
+  UserThrottle
 } = require('../models');
 const { verifyToken } = require('../middleware');
 
@@ -397,7 +398,25 @@ router.post('/network-usage', async (req, res) => {
       latestStateCache.delete(firstKey);
     }
     
-    res.status(200).json({ status: 'updated' });
+    // Look up server-side throttle config for this user and include in response
+    const response = { status: 'updated' };
+    try {
+      const throttleConfig = await UserThrottle.findOne({ user_id }).lean();
+      if (throttleConfig && throttleConfig.throttle_enabled) {
+        response.throttle = {
+          enabled: true,
+          download_kbps: throttleConfig.download_kbps,
+          upload_kbps: throttleConfig.upload_kbps
+        };
+      } else {
+        response.throttle = { enabled: false };
+      }
+    } catch (throttleErr) {
+      // Non-fatal — still return the telemetry response
+      console.error('Error looking up throttle config:', throttleErr.message);
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     console.error('Error updating network telemetry:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -1409,6 +1428,144 @@ router.get('/api/telemetry/xray-stats', verifyToken, async (req, res) => {
     res.json({ timeRangeText, results });
   } catch (error) {
     console.error('Xray Stats Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ==================== USER THROTTLE MANAGEMENT ====================
+
+// GET /api/user-throttles - List all users with throttle overrides + search through all known users
+router.get('/api/user-throttles', verifyToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const search = req.query.search ? req.query.search.trim() : '';
+    const filter = req.query.filter || 'all'; // 'all', 'throttled', 'unthrottled'
+
+    // Get all throttle configs
+    const allThrottles = await UserThrottle.find().lean();
+    const throttleMap = {};
+    allThrottles.forEach(t => { throttleMap[t.user_id] = t; });
+
+    // Build search query for distinct users from NetworkTelemetry
+    let matchQuery = {};
+    if (search) {
+      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const numericSearch = parseInt(search);
+      matchQuery.$or = [
+        { 'telegram_user.first_name': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.last_name': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.phone_number': { $regex: safeSearch, $options: 'i' } },
+        { 'telegram_user.username': { $regex: safeSearch, $options: 'i' } }
+      ];
+      if (!isNaN(numericSearch)) {
+        matchQuery.$or.push({ user_id: numericSearch });
+      }
+    }
+
+    // Aggregate distinct users from NetworkTelemetry
+    const pipeline = [
+      ...(Object.keys(matchQuery).length > 0 ? [{ $match: matchQuery }] : []),
+      { $sort: { last_updated: -1 } },
+      {
+        $group: {
+          _id: '$user_id',
+          first_name: { $first: '$telegram_user.first_name' },
+          last_name: { $first: '$telegram_user.last_name' },
+          phone_number: { $first: '$telegram_user.phone_number' },
+          username: { $first: '$telegram_user.username' },
+          last_updated: { $first: '$last_updated' },
+          apk_version: { $first: '$apk_version' }
+        }
+      },
+      { $sort: { last_updated: -1 } }
+    ];
+
+    let users = await NetworkTelemetry.aggregate(pipeline).allowDiskUse(true);
+
+    // Merge throttle data
+    users = users.map(u => {
+      const throttle = throttleMap[u._id];
+      return {
+        user_id: u._id,
+        first_name: u.first_name || 'Unknown',
+        last_name: u.last_name || '',
+        phone_number: u.phone_number || '',
+        username: u.username || '',
+        last_updated: u.last_updated,
+        apk_version: u.apk_version || '',
+        throttle_enabled: throttle ? throttle.throttle_enabled : false,
+        download_kbps: throttle ? throttle.download_kbps : 250,
+        upload_kbps: throttle ? throttle.upload_kbps : 250,
+        throttle_updated_at: throttle ? throttle.updated_at : null,
+        throttle_updated_by: throttle ? throttle.updated_by : ''
+      };
+    });
+
+    // Apply throttle filter
+    if (filter === 'throttled') {
+      users = users.filter(u => u.throttle_enabled);
+    } else if (filter === 'unthrottled') {
+      users = users.filter(u => !u.throttle_enabled);
+    }
+
+    const total = users.length;
+    const throttledCount = users.filter(u => u.throttle_enabled).length;
+    const paged = users.slice(skip, skip + limit);
+
+    res.json({ total, throttledCount, data: paged });
+  } catch (error) {
+    console.error('Error fetching user throttles:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /api/user-throttle/:user_id - Create or update throttle config
+router.post('/api/user-throttle/:user_id', verifyToken, async (req, res) => {
+  try {
+    const user_id = parseInt(req.params.user_id);
+    if (isNaN(user_id)) return res.status(400).json({ error: 'Invalid user_id' });
+
+    const { throttle_enabled, download_kbps, upload_kbps, first_name, last_name, phone_number, username } = req.body;
+
+    const update = {
+      throttle_enabled: throttle_enabled !== undefined ? throttle_enabled : false,
+      updated_at: new Date(),
+      updated_by: req.user?.username || 'admin'
+    };
+    if (download_kbps !== undefined) update.download_kbps = parseInt(download_kbps) || 250;
+    if (upload_kbps !== undefined) update.upload_kbps = parseInt(upload_kbps) || 250;
+    if (first_name !== undefined) update.first_name = first_name;
+    if (last_name !== undefined) update.last_name = last_name;
+    if (phone_number !== undefined) update.phone_number = phone_number;
+    if (username !== undefined) update.username = username;
+
+    const result = await UserThrottle.findOneAndUpdate(
+      { user_id },
+      { $set: update, $setOnInsert: { user_id } },
+      { upsert: true, new: true, lean: true }
+    );
+
+    console.log(`[SpeedControl] ${req.user?.username || 'admin'} set throttle for user ${user_id}: enabled=${update.throttle_enabled}, down=${update.download_kbps || result.download_kbps}KB/s, up=${update.upload_kbps || result.upload_kbps}KB/s`);
+    res.json({ status: 'updated', config: result });
+  } catch (error) {
+    console.error('Error updating user throttle:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE /api/user-throttle/:user_id - Remove throttle config
+router.delete('/api/user-throttle/:user_id', verifyToken, async (req, res) => {
+  try {
+    const user_id = parseInt(req.params.user_id);
+    if (isNaN(user_id)) return res.status(400).json({ error: 'Invalid user_id' });
+
+    await UserThrottle.deleteOne({ user_id });
+    console.log(`[SpeedControl] ${req.user?.username || 'admin'} removed throttle for user ${user_id}`);
+    res.json({ status: 'deleted' });
+  } catch (error) {
+    console.error('Error deleting user throttle:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

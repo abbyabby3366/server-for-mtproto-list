@@ -13,6 +13,7 @@ import XrayStats from './pages/XrayStats';
 import Configs from './pages/Configs';
 import Users from './pages/Users';
 import TrafficReport from './pages/TrafficReport';
+import SpeedControl from './pages/SpeedControl';
 
 // A wrapper component for protecting routes
 const ProtectedRoute = ({ children }) => {
@@ -79,6 +80,14 @@ function App() {
         element={
           <ProtectedRoute>
             <TalkProUsers />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/speed-control" 
+        element={
+          <ProtectedRoute>
+            <SpeedControl />
           </ProtectedRoute>
         } 
       />
