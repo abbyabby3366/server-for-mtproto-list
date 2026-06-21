@@ -132,7 +132,6 @@ const userThrottleSchema = new mongoose.Schema({
   phone_number: { type: String, default: '' },
   username: { type: String, default: '' }
 });
-userThrottleSchema.index({ user_id: 1 }, { unique: true });
 const UserThrottle = mongoose.model('UserThrottle', userThrottleSchema);
 
 const userSchema = new mongoose.Schema({

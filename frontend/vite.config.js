@@ -7,27 +7,27 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
       '/proxies': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
       '/transit-ips': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
       '/user-login-details': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
       '/network-usage': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5005',
         changeOrigin: true,
       },
     }

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const cron = require('node-cron');
 const {
   LoginTelemetry,
   NetworkTelemetry,
@@ -599,6 +600,36 @@ router.delete('/api/telemetry/network', verifyToken, async (req, res) => {
   }
 });
 
+// Helper logic for pruning network pings telemetry
+async function flushNetworkTelemetry(days = 7) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const latestPerUser = await NetworkTelemetry.aggregate([
+    { $group: { _id: '$user_id', latestId: { $max: '$_id' } } }
+  ]);
+  const keepIds = latestPerUser.map(u => u.latestId).filter(Boolean);
+
+  const result = await NetworkTelemetry.deleteMany({
+    last_updated: { $lt: cutoff },
+    _id: { $nin: keepIds }
+  });
+
+  return { deletedCount: result.deletedCount, days };
+}
+
+// Schedule daily cleanup (reads cron pattern from environment variable)
+const cleanupCronSchedule = process.env.TELEMETRY_CLEANUP_CRON || '0 0 * * *';
+cron.schedule(cleanupCronSchedule, async () => {
+  try {
+    const days = parseInt(process.env.DATA_RETENTION_DAYS) || 7;
+    const result = await flushNetworkTelemetry(days);
+    console.log(`[CronCleanup] Scheduled auto-flush completed (${cleanupCronSchedule}). Deleted ${result.deletedCount} NetworkTelemetry records older than ${result.days} days (keeping latest per user)`);
+  } catch (err) {
+    console.error('[CronCleanup] Error during scheduled auto-flush:', err);
+  }
+});
+
 // POST /api/telemetry/flush-network
 router.post('/api/telemetry/flush-network', verifyToken, async (req, res) => {
   try {
@@ -608,21 +639,9 @@ router.post('/api/telemetry/flush-network', verifyToken, async (req, res) => {
       days = 7;
     }
 
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-
-    const latestPerUser = await NetworkTelemetry.aggregate([
-      { $group: { _id: '$user_id', latestId: { $max: '$_id' } } }
-    ]);
-    const keepIds = latestPerUser.map(u => u.latestId).filter(Boolean);
-
-    const result = await NetworkTelemetry.deleteMany({
-      last_updated: { $lt: cutoff },
-      _id: { $nin: keepIds }
-    });
-
-    console.log(`[ManualFlush] Deleted ${result.deletedCount} old NetworkTelemetry records (older than ${days} days, keeping latest per user)`);
-    res.json({ status: 'flushed', deletedCount: result.deletedCount, days });
+    const result = await flushNetworkTelemetry(days);
+    console.log(`[ManualFlush] Deleted ${result.deletedCount} old NetworkTelemetry records (older than ${result.days} days, keeping latest per user)`);
+    res.json({ status: 'flushed', ...result });
   } catch (error) {
     console.error('[ManualFlush] Error during flush:', error);
     res.status(500).json({ error: 'Internal Server Error' });

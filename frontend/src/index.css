@@ -587,3 +587,189 @@ tr:hover td {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ==================================================== */
+/* TELEMETRY / NETWORK USAGE RESPONSIVE STYLES */
+/* ==================================================== */
+
+.telemetry-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.telemetry-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.telemetry-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.telemetry-search-wrapper {
+  position: relative;
+  min-width: 260px;
+}
+
+.telemetry-search-input {
+  padding-left: 32px !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.telemetry-select {
+  width: auto !important;
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+
+.telemetry-stats-btn {
+  margin: 0 !important;
+}
+
+.telemetry-delete-container {
+  position: relative;
+  margin-left: auto;
+}
+
+.telemetry-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  min-width: 220px;
+  overflow: hidden;
+}
+
+.telemetry-tabs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.telemetry-pagination {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 8px 10px;
+}
+
+.telemetry-table-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 15px;
+  padding: 10px;
+  background: #f8fafc;
+  border-top: 1px solid var(--border-color);
+  border-radius: 0 0 8px 8px;
+  margin-top: -1px;
+}
+
+/* Tablet & Mobile Layouts */
+@media (max-width: 1024px) {
+  .telemetry-header {
+    display: grid;
+    grid-template-areas: 
+      "title delete"
+      "controls controls";
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+  
+  .telemetry-title-row {
+    grid-area: title;
+  }
+  
+  .telemetry-delete-container {
+    grid-area: delete;
+    margin-left: 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .telemetry-controls {
+    grid-area: controls;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .telemetry-search-wrapper {
+    grid-column: span 2;
+    min-width: 0;
+  }
+
+  .telemetry-select {
+    width: 100% !important;
+  }
+
+  .telemetry-stats-btn {
+    width: 100% !important;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .telemetry-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .telemetry-tabs-row .tabs {
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .telemetry-tabs-row .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0 !important;
+  }
+  
+  .telemetry-pagination {
+    width: 100%;
+    justify-content: space-between !important;
+    padding: 6px 0 !important;
+    box-sizing: border-box;
+  }
+
+  .telemetry-table-footer {
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 576px) {
+  .telemetry-controls {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .telemetry-search-wrapper {
+    grid-column: span 1;
+  }
+}

@@ -324,8 +324,8 @@ const NetworkUsage = () => {
   return (
     <div>
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+        <div className="telemetry-header">
+          <div className="telemetry-title-row">
             <h2 className="card-title" style={{ margin: 0 }}>
               <Activity size={20} color="#3498db" />
               {t('Network Usage')}
@@ -333,20 +333,21 @@ const NetworkUsage = () => {
             
             {indicatorLoading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="spinner" style={{ borderTopColor: '#64748b', width: '12px', height: '12px' }}></span>
+                <span className="spinner" style={{ borderTopColor: '#64748b', width: '12px', height: '12px', margin: '0 4px' }}></span>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>{t('Updating...')}</span>
               </div>
             )}
-            
-            <div style={{ position: 'relative' }}>
+          </div>
+
+          <div className="telemetry-controls">
+            <div className="telemetry-search-wrapper">
               <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
                 placeholder={t('Search user, IP, phone, APK version...')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="form-control"
-                style={{ paddingLeft: '32px', width: '280px', margin: 0 }}
+                className="form-control telemetry-search-input"
               />
             </div>
 
@@ -357,8 +358,7 @@ const NetworkUsage = () => {
                 setUserPage(1);
                 setTimePage(1);
               }}
-              className="form-control"
-              style={{ width: 'auto', margin: 0, padding: '8px 12px', fontSize: '13px' }}
+              className="form-control telemetry-select"
             >
               <option value="all">{t('All Traffic')}</option>
               <option value="true">{t('Foreground Only')}</option>
@@ -367,7 +367,7 @@ const NetworkUsage = () => {
             </select>
             
             <button 
-              className="btn btn-success" 
+              className="btn btn-success telemetry-stats-btn" 
               onClick={() => { handleLoadStats(); }}
             >
               <BarChart3 size={14} />
@@ -376,7 +376,7 @@ const NetworkUsage = () => {
           </div>
 
           {/* Delete administrative actions menu */}
-          <div style={{ position: 'relative' }} id="delete-menu-container">
+          <div className="telemetry-delete-container" id="delete-menu-container">
             <button 
               className="btn btn-danger" 
               onClick={() => setShowDeleteMenu(!showDeleteMenu)} 
@@ -385,19 +385,7 @@ const NetworkUsage = () => {
               <Trash2 size={16} />
             </button>
             {showDeleteMenu && (
-              <div style={{
-                position: 'absolute',
-                right: 0,
-                top: '100%',
-                marginTop: '8px',
-                background: 'white',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                zIndex: 100,
-                minWidth: '220px',
-                overflow: 'hidden'
-              }}>
+              <div className="telemetry-dropdown-menu">
                 <div style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', color: '#64748b', borderBottom: '1px solid var(--border-color)', textTransform: 'uppercase' }}>
                   {t('Delete pings older than...')}
                 </div>
@@ -444,15 +432,8 @@ const NetworkUsage = () => {
         </div>
 
         {/* Tab Selection & Pagination Row */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          borderBottom: '1px solid var(--border-color)', 
-          marginBottom: '15px',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}>
+        {/* Tab Selection & Pagination Row */}
+        <div className="telemetry-tabs-row">
           {/* Left: Tab Buttons */}
           <div className="tabs" style={{ display: 'flex', borderBottom: 'none', marginBottom: 0 }}>
             <div 
@@ -488,7 +469,7 @@ const NetworkUsage = () => {
           </div>
 
           {/* Right: Pagination Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '8px 10px' }}>
+          <div className="telemetry-pagination">
             <span style={{ color: '#64748b', fontSize: '12px' }}>
               {t('Showing')} {startItem}-{endItem} {t('of')} {activeTab === 'user' ? totalUsers : totalPings} {activeTab === 'user' ? t('users') : t('pings')}
             </span>
@@ -621,7 +602,7 @@ const NetworkUsage = () => {
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', padding: '10px', background: '#f8fafc', borderTop: '1px solid var(--border-color)', borderRadius: '0 0 8px 8px', marginTop: '-1px' }}>
+            <div className="telemetry-table-footer">
               <span style={{ color: '#64748b', fontSize: '12px' }}>
                 {t('Showing')} {startItem}-{endItem} {t('of')} {totalUsers} {t('users')}
               </span>
@@ -730,7 +711,7 @@ const NetworkUsage = () => {
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', padding: '10px', background: '#f8fafc', borderTop: '1px solid var(--border-color)', borderRadius: '0 0 8px 8px', marginTop: '-1px' }}>
+            <div className="telemetry-table-footer">
               <span style={{ color: '#64748b', fontSize: '12px' }}>
                 {t('Showing')} {startItem}-{endItem} {t('of')} {totalPings} {t('pings')}
               </span>
