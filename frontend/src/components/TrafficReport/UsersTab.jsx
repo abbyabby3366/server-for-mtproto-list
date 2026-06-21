@@ -44,7 +44,7 @@ const UsersTab = ({
       }}>
         <AlertTriangle size={15} color="#dc2626" />
         <span>
-          <strong>{t('Usage Alert')}:</strong> {t('Red background flags represent active account connections routing >= 500MB total data volume.')}
+          <strong>{t('Usage Alert')}:</strong> {t('Red background flags represent active account connections routing >= 5GB total data volume.')}
         </span>
       </div>
 
@@ -82,7 +82,7 @@ const UsersTab = ({
 
               return filtered.map((u) => {
                 const totalBytes = u.bytesSent + u.bytesReceived;
-                const hasAlert = totalBytes >= 500 * 1024 * 1024;
+                const hasAlert = totalBytes >= 5 * 1024 * 1024 * 1024;
                 const totalNet = (u.mobileSent + u.mobileReceived + u.wifiSent + u.wifiReceived) || 1;
                 const mobPerc = Math.round(((u.mobileSent + u.mobileReceived) / totalNet) * 100);
                 const wifiPerc = 100 - mobPerc;

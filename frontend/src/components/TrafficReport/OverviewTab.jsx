@@ -352,7 +352,7 @@ const OverviewTab = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {reportData.users.slice(0, 5).map((u, i) => {
               const totalBytes = u.bytesSent + u.bytesReceived;
-              const hasAlert = totalBytes >= 500 * 1024 * 1024;
+              const hasAlert = totalBytes >= 5 * 1024 * 1024 * 1024;
               return (
                 <div 
                   key={u.user_id} 

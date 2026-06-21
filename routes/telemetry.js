@@ -173,6 +173,11 @@ function getBucketKey(date, selectInterval) {
     const roundedMin = minutes - (minutes % 5);
     const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), roundedMin, 0, 0);
     return d.toISOString();
+  } else if (selectInterval === '30m') {
+    const minutes = date.getMinutes();
+    const roundedMin = minutes - (minutes % 30);
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), roundedMin, 0, 0);
+    return d.toISOString();
   } else if (selectInterval === '1h') {
     const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), 0, 0, 0);
     return d.toISOString();
@@ -286,7 +291,7 @@ function aggregateTrafficPings(pings, selectInterval) {
   const aggregateTimeline = Object.values(timelineMap).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).map(bucket => {
     const d = new Date(bucket.timestamp);
     let timeLabel = "";
-    if (selectInterval === '5m' || selectInterval === '1h') {
+    if (selectInterval === '5m' || selectInterval === '30m' || selectInterval === '1h') {
       timeLabel = d.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', hour12: false });
     } else {
       timeLabel = d.toLocaleDateString("en-US", { month: 'short', day: 'numeric' });

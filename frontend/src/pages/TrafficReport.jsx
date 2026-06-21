@@ -34,8 +34,8 @@ const TrafficReport = () => {
   const [reportData, setReportData] = useState(null);
 
   // Filter States
-  const [timeframe, setTimeframe] = useState('this_week');
-  const [interval, setReportInterval] = useState('1d'); // empty means let backend decide based on timeframe
+  const [timeframe, setTimeframe] = useState('today');
+  const [interval, setReportInterval] = useState('1h'); // empty means let backend decide based on timeframe
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedProxy, setSelectedProxy] = useState('');
   
@@ -285,6 +285,7 @@ const TrafficReport = () => {
           >
             <option value="" style={{ backgroundColor: '#1e293b' }}>{t('Interval')}</option>
             <option value="5m" style={{ backgroundColor: '#1e293b' }}>5m</option>
+            <option value="30m" style={{ backgroundColor: '#1e293b' }}>30m</option>
             <option value="1h" style={{ backgroundColor: '#1e293b' }}>1h</option>
             <option value="1d" style={{ backgroundColor: '#1e293b' }}>1d</option>
           </select>
