@@ -268,6 +268,8 @@ const SpeedControl = () => {
               >
                 <option value="all">{t('All Users')}</option>
                 <option value="throttled">{t('Throttled Only')}</option>
+                <option value="auto_throttled">🐢 {t('Auto-Limited Only')}</option>
+                <option value="manual_throttled">🔧 {t('Manual Only')}</option>
                 <option value="unthrottled">{t('Full Speed Only')}</option>
               </select>
             </div>
@@ -371,15 +373,42 @@ const SpeedControl = () => {
 
                       {/* Status badge */}
                       <td>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '4px',
-                          padding: '4px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: 700,
-                          background: row.throttle_enabled ? '#fef3c7' : '#f0fdf4',
-                          color: row.throttle_enabled ? '#92400e' : '#166534',
-                          border: `1px solid ${row.throttle_enabled ? '#fde68a' : '#bbf7d0'}`
-                        }}>
-                          {row.throttle_enabled ? t('Throttled') : t('Full Speed')}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {row.throttle_enabled ? (
+                            row.throttle_updated_by === 'system_auto_limit' ? (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                padding: '4px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: 700,
+                                background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa'
+                              }}>
+                                🐢 {t('Auto-Limited')}
+                              </span>
+                            ) : (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                padding: '4px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: 700,
+                                background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe'
+                              }}>
+                                🔧 {t('Manual')}
+                              </span>
+                            )
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              padding: '4px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: 700,
+                              background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0'
+                            }}>
+                              ⚡ {t('Full Speed')}
+                            </span>
+                          )}
+                          {row.throttle_enabled && (
+                            <span style={{ fontSize: '10px', color: '#94a3b8', paddingLeft: '2px' }}>
+                              {row.throttle_updated_by === 'system_auto_limit' 
+                                ? t('Resets at midnight') 
+                                : row.throttle_updated_by ? `${t('by')} ${row.throttle_updated_by}` : ''}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Download speed */}
@@ -486,13 +515,6 @@ const SpeedControl = () => {
                             </button>
                           )}
                         </div>
-
-                        {/* Show who last modified */}
-                        {row.throttle_updated_by && row.throttle_enabled && (
-                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px' }}>
-                            {t('by')} {row.throttle_updated_by}
-                          </div>
-                        )}
                       </td>
                     </tr>
                   );

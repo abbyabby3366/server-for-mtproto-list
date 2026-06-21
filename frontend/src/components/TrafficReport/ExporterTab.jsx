@@ -25,7 +25,7 @@ const ExporterTab = ({
             className="btn btn-success" 
             style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155' }}
             onClick={() => {
-              const headers = ['User ID', 'Name', 'Phone', 'IP', 'Bytes Sent', 'Bytes Received', 'Total Bytes', 'Mobile Bytes', 'WiFi Bytes', 'Pings Count', 'Failed Pings', 'Success Rate %'];
+              const headers = ['User ID', 'Name', 'Phone', 'IP', 'Bytes Sent', 'Bytes Received', 'Total Bytes', 'Mobile Bytes', 'WiFi Bytes', 'Pings Count', 'Failed Pings', 'Success Rate %', 'Throttle Status', 'Throttle Method'];
               const rows = reportData.users.map(u => {
                 const totalBytes = u.bytesSent + u.bytesReceived;
                 const successRate = u.totalPings ? ((u.totalPings - u.failedPings) / u.totalPings * 100).toFixed(2) : '100.00';
@@ -41,7 +41,9 @@ const ExporterTab = ({
                   u.wifiSent + u.wifiReceived,
                   u.totalPings,
                   u.failedPings,
-                  successRate
+                  successRate,
+                  u.throttle_enabled ? 'Throttled' : 'Full Speed',
+                  u.throttle_method || 'N/A'
                 ];
               });
               handleCopyCsv(headers, rows);
@@ -56,7 +58,7 @@ const ExporterTab = ({
             className="btn btn-primary"
             style={{ background: '#ea580c', border: 'none', color: '#fff' }}
             onClick={() => {
-              const headers = ['User ID', 'Name', 'Phone', 'IP', 'Bytes Sent', 'Bytes Received', 'Total Bytes', 'Mobile Bytes', 'WiFi Bytes', 'Pings Count', 'Failed Pings', 'Success Rate %'];
+              const headers = ['User ID', 'Name', 'Phone', 'IP', 'Bytes Sent', 'Bytes Received', 'Total Bytes', 'Mobile Bytes', 'WiFi Bytes', 'Pings Count', 'Failed Pings', 'Success Rate %', 'Throttle Status', 'Throttle Method'];
               const rows = reportData.users.map(u => {
                 const totalBytes = u.bytesSent + u.bytesReceived;
                 const successRate = u.totalPings ? ((u.totalPings - u.failedPings) / u.totalPings * 100).toFixed(2) : '100.00';
@@ -72,7 +74,9 @@ const ExporterTab = ({
                   u.wifiSent + u.wifiReceived,
                   u.totalPings,
                   u.failedPings,
-                  successRate
+                  successRate,
+                  u.throttle_enabled ? 'Throttled' : 'Full Speed',
+                  u.throttle_method || 'N/A'
                 ];
               });
               handleDownloadCsv(headers, rows, 'grapefruittalk_traffic_report');
@@ -97,6 +101,7 @@ const ExporterTab = ({
               <th>{t('Total Pings')}</th>
               <th>{t('Failed Pings')}</th>
               <th>{t('Ping Success Rate')}</th>
+              <th>{t('Throttle Status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -119,6 +124,30 @@ const ExporterTab = ({
                     <span style={{ fontWeight: 600, color: parseFloat(successRate) >= 85 ? 'var(--success-color)' : 'var(--danger-color)' }}>
                       {successRate}%
                     </span>
+                  </td>
+                  <td>
+                    {u.throttle_enabled ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {u.throttle_method === 'auto' ? (
+                          <span style={{
+                            fontSize: '11px', fontWeight: 700, color: '#c2410c'
+                          }}>
+                            🐢 {t('Auto-Limited')}
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: '11px', fontWeight: 700, color: '#6d28d9'
+                          }}>
+                            🔧 {t('Manual')}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                          ↓{u.throttle_download_kbps} ↑{u.throttle_upload_kbps} KB/s
+                        </span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#166534' }}>⚡ {t('Full Speed')}</span>
+                    )}
                   </td>
                 </tr>
               );

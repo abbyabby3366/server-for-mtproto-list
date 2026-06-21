@@ -407,7 +407,69 @@ router.post('/network-usage', async (req, res) => {
     // Look up server-side throttle config for this user and include in response
     const response = { status: 'updated' };
     try {
-      const throttleConfig = await UserThrottle.findOne({ user_id }).lean();
+      let throttleConfig = await UserThrottle.findOne({ user_id });
+      
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      // 1. Dynamic Check: Clear previous day's auto-throttle if it exists
+      if (throttleConfig && throttleConfig.throttle_enabled && throttleConfig.updated_by === 'system_auto_limit') {
+        if (throttleConfig.updated_at < todayStart) {
+          // Release throttle
+          throttleConfig.throttle_enabled = false;
+          throttleConfig.updated_at = new Date();
+          throttleConfig.updated_by = '';
+          await throttleConfig.save();
+          console.log(`[AutoThrottle] Released auto-throttle for user ${user_id} (new day started)`);
+        }
+      }
+
+      // 2. Daily Usage Evaluation: Check if user has exceeded 5GB today
+      if (!throttleConfig || !throttleConfig.throttle_enabled) {
+        const todayUsage = await NetworkTelemetry.aggregate([
+          {
+            $match: {
+              user_id: user_id,
+              last_updated: { $gte: todayStart }
+            }
+          },
+          {
+            $group: {
+              _id: "$user_id",
+              todaySent: { $sum: "$delta_sent" },
+              todayReceived: { $sum: "$delta_received" }
+            }
+          }
+        ]);
+
+        if (todayUsage.length > 0) {
+          const totalToday = (todayUsage[0].todaySent || 0) + (todayUsage[0].todayReceived || 0);
+          if (totalToday >= 5 * 1024 * 1024 * 1024) {
+            // Exceeded 5GB! Auto-throttle user.
+            const telegramUser = payload.telegram_user || {};
+            const updateFields = {
+              throttle_enabled: true,
+              download_kbps: 250,
+              upload_kbps: 250,
+              updated_at: new Date(),
+              updated_by: 'system_auto_limit',
+              // Update user display info if present
+              first_name: telegramUser.first_name || (throttleConfig ? throttleConfig.first_name : 'Unknown'),
+              last_name: telegramUser.last_name || (throttleConfig ? throttleConfig.last_name : ''),
+              phone_number: telegramUser.phone_number || (throttleConfig ? throttleConfig.phone_number : ''),
+              username: telegramUser.username || (throttleConfig ? throttleConfig.username : '')
+            };
+
+            throttleConfig = await UserThrottle.findOneAndUpdate(
+              { user_id },
+              { $set: updateFields, $setOnInsert: { user_id } },
+              { upsert: true, new: true }
+            );
+            console.log(`[AutoThrottle] Automatically throttled user ${user_id} for exceeding 5GB daily usage (${totalToday} bytes)`);
+          }
+        }
+      }
+
       if (throttleConfig && throttleConfig.throttle_enabled) {
         response.throttle = {
           enabled: true,
@@ -419,7 +481,7 @@ router.post('/network-usage', async (req, res) => {
       }
     } catch (throttleErr) {
       // Non-fatal — still return the telemetry response
-      console.error('Error looking up throttle config:', throttleErr.message);
+      console.error('Error looking up/updating throttle config:', throttleErr.message);
     }
 
     res.status(200).json(response);
@@ -1328,6 +1390,25 @@ router.get('/api/telemetry/traffic-report', verifyToken, async (req, res) => {
 
     const stats = aggregateTrafficPings(pings, selectInterval);
 
+    // Enrich users with throttle status
+    const userIds = stats.users.map(u => u.user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const throttles = await UserThrottle.find({ user_id: { $in: userIds } }).lean();
+      const throttleMap = {};
+      throttles.forEach(t => { throttleMap[t.user_id] = t; });
+
+      stats.users = stats.users.map(u => {
+        const t = throttleMap[u.user_id];
+        return {
+          ...u,
+          throttle_enabled: t ? t.throttle_enabled : false,
+          throttle_method: t && t.throttle_enabled ? (t.updated_by === 'system_auto_limit' ? 'auto' : 'manual') : null,
+          throttle_download_kbps: t ? t.download_kbps : null,
+          throttle_upload_kbps: t ? t.upload_kbps : null
+        };
+      });
+    }
+
     res.json(stats);
   } catch (error) {
     console.error('Traffic Report Endpoint Error:', error);
@@ -1532,6 +1613,10 @@ router.get('/api/user-throttles', verifyToken, async (req, res) => {
       users = users.filter(u => u.throttle_enabled);
     } else if (filter === 'unthrottled') {
       users = users.filter(u => !u.throttle_enabled);
+    } else if (filter === 'auto_throttled') {
+      users = users.filter(u => u.throttle_enabled && u.throttle_updated_by === 'system_auto_limit');
+    } else if (filter === 'manual_throttled') {
+      users = users.filter(u => u.throttle_enabled && u.throttle_updated_by !== 'system_auto_limit');
     }
 
     const total = users.length;

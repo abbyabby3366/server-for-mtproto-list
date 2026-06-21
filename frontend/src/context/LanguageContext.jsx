@@ -273,7 +273,19 @@ const translations = {
   "Ping Health Rate": "Ping 健康率",
   "Traffic Timeline History": "流量時間線歷史",
   "No timelines recorded for this proxy server.": "此代理服務器無記錄時間線。",
-  "No active users routed through this IP for the period.": "此期間無活躍用戶經由該 IP。"
+  "No active users routed through this IP for the period.": "此期間無活躍用戶經由該 IP。",
+
+  // Throttle Status
+  "Throttle Status": "限速狀態",
+  "Throttled": "已限速",
+  "Auto-Limited": "自動限速",
+  "Auto-Limited Only": "僅自動限速",
+  "Manual Only": "僅手動限速",
+  "Full Speed": "全速",
+  "Auto (5GB Limit)": "自動 (5GB 上限)",
+  "Manual": "手動",
+  "Resets at midnight": "午夜自動解除",
+  "by": "由"
 };
 
 export const LanguageProvider = ({ children }) => {

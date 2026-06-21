@@ -59,6 +59,7 @@ const UsersTab = ({
               <th>{t('Total Consumption')}</th>
               <th>{t('Network split (Mob / WiFi)')}</th>
               <th>{t('Ping Success Rate')}</th>
+              <th>{t('Throttle Status')}</th>
               <th>{t('Actions')}</th>
             </tr>
           </thead>
@@ -73,7 +74,7 @@ const UsersTab = ({
               if (filtered.length === 0) {
                 return (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
                       {t('No users matched search parameters.')}
                     </td>
                   </tr>
@@ -123,6 +124,43 @@ const UsersTab = ({
                       <span className={`badge ${parseFloat(successRate) >= 85 ? 'badge-success' : 'badge-danger'}`}>
                         {successRate}%
                       </span>
+                    </td>
+                    <td>
+                      {u.throttle_enabled ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          {u.throttle_method === 'auto' ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              padding: '3px 9px', borderRadius: '10px', fontSize: '11px', fontWeight: 700,
+                              background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa',
+                              width: 'fit-content'
+                            }}>
+                              🐢 {t('Auto-Limited')}
+                            </span>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              padding: '3px 9px', borderRadius: '10px', fontSize: '11px', fontWeight: 700,
+                              background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe',
+                              width: 'fit-content'
+                            }}>
+                              🔧 {t('Manual')}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '10px', color: '#94a3b8', paddingLeft: '2px' }}>
+                            ↓{u.throttle_download_kbps} ↑{u.throttle_upload_kbps} KB/s
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          padding: '3px 9px', borderRadius: '10px', fontSize: '11px', fontWeight: 600,
+                          background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0',
+                          width: 'fit-content'
+                        }}>
+                          ⚡ {t('Full Speed')}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <button 
