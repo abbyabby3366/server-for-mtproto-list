@@ -1383,6 +1383,31 @@ router.get('/api/telemetry/traffic-report', verifyToken, async (req, res) => {
     const selectInterval = getTrafficReportInterval(interval, timeframe);
 
     let pings = await NetworkTelemetry.find(query)
+      .select({
+        delta_sent: 1,
+        delta_received: 1,
+        delta_mobile_sent: 1,
+        delta_mobile_received: 1,
+        delta_wifi_sent: 1,
+        delta_wifi_received: 1,
+        'active_connection.telegram_ping_ms': 1,
+        'active_connection.type': 1,
+        last_updated: 1,
+        user_id: 1,
+        first_name: 1,
+        last_name: 1,
+        phone_number: 1,
+        username: 1,
+        'telegram_user.first_name': 1,
+        'telegram_user.last_name': 1,
+        'telegram_user.phone_number': 1,
+        'telegram_user.username': 1,
+        active_proxy_ip: 1,
+        'network_usage.mobile_bytes_sent': 1,
+        'network_usage.mobile_bytes_received': 1,
+        'network_usage.wifi_bytes_sent': 1,
+        'network_usage.wifi_bytes_received': 1
+      })
       .sort({ last_updated: -1 })
       .limit(25000)
       .lean();

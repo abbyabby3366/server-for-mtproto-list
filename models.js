@@ -23,6 +23,7 @@ const networkTelemetrySchema = new mongoose.Schema({
 }, { strict: false });
 networkTelemetrySchema.index({ last_updated: -1 });
 networkTelemetrySchema.index({ user_id: 1, last_updated: -1 });
+networkTelemetrySchema.index({ active_proxy_ip: 1, last_updated: -1 });
 networkTelemetrySchema.index({ 'device_info.is_in_foreground': 1, last_updated: -1 });
 const NetworkTelemetry = mongoose.model('NetworkTelemetry', networkTelemetrySchema);
 
