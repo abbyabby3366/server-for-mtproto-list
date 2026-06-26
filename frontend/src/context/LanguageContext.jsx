@@ -285,7 +285,8 @@ const translations = {
   "Auto (5GB Limit)": "自動 (5GB 上限)",
   "Manual": "手動",
   "Resets at midnight": "午夜自動解除",
-  "by": "由"
+  "by": "由",
+  "Usage Today": "今日用量"
 };
 
 export const LanguageProvider = ({ children }) => {

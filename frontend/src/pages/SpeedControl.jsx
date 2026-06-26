@@ -181,6 +181,16 @@ const SpeedControl = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const val = (bytes / Math.pow(1024, i)).toFixed(i >= 2 ? 2 : 0);
+    return `${val} ${units[i]}`;
+  };
+
+  const DAILY_LIMIT_BYTES = 5 * 1024 * 1024 * 1024; // 5GB
+
   const getTimeSince = (dateStr) => {
     if (!dateStr) return 'N/A';
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -315,6 +325,7 @@ const SpeedControl = () => {
               <tr>
                 <th>{t('User')}</th>
                 <th>{t('Last Seen')}</th>
+                <th>{t('Usage Today')}</th>
                 <th>{t('Status')}</th>
                 <th>{t('Download')}</th>
                 <th>{t('Upload')}</th>
@@ -324,13 +335,13 @@ const SpeedControl = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px 0' }}>
                     <span className="spinner" style={{ borderTopColor: '#d97706', width: '24px', height: '24px' }}></span>
                   </td>
                 </tr>
               ) : usersData.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
                     {t('No users found.')}
                   </td>
                 </tr>
@@ -369,6 +380,40 @@ const SpeedControl = () => {
                       {/* Last seen */}
                       <td style={{ fontSize: '12.5px', color: '#475569' }}>
                         {getTimeSince(row.last_updated)}
+                      </td>
+
+                      {/* Usage Today */}
+                      <td style={{ fontSize: '12px', minWidth: '120px' }}>
+                        {(() => {
+                          const usage = row.usage_today_bytes || 0;
+                          const pct = Math.min((usage / DAILY_LIMIT_BYTES) * 100, 100);
+                          const isOver = usage >= DAILY_LIMIT_BYTES;
+                          const isNear = pct >= 70 && !isOver;
+                          const barColor = isOver ? '#dc2626' : isNear ? '#d97706' : '#22c55e';
+                          const textColor = isOver ? '#dc2626' : isNear ? '#92400e' : '#475569';
+                          return (
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                                <span style={{ fontWeight: 600, color: textColor }}>
+                                  {formatBytes(usage)}
+                                </span>
+                                <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                  / 5 GB
+                                </span>
+                              </div>
+                              <div style={{
+                                width: '100%', height: '4px', borderRadius: '2px',
+                                background: '#e2e8f0', overflow: 'hidden'
+                              }}>
+                                <div style={{
+                                  width: `${pct}%`, height: '100%', borderRadius: '2px',
+                                  background: barColor,
+                                  transition: 'width 0.5s ease'
+                                }} />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Status badge */}

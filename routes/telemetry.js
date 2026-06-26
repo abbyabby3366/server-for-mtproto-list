@@ -1648,7 +1648,45 @@ router.get('/api/user-throttles', verifyToken, async (req, res) => {
     const throttledCount = users.filter(u => u.throttle_enabled).length;
     const paged = users.slice(skip, skip + limit);
 
-    res.json({ total, throttledCount, data: paged });
+    // Fetch today's network usage for paged users
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const pagedUserIds = paged.map(u => u.user_id);
+
+    let usageMap = {};
+    if (pagedUserIds.length > 0) {
+      try {
+        const todayUsage = await NetworkTelemetry.aggregate([
+          {
+            $match: {
+              user_id: { $in: pagedUserIds },
+              last_updated: { $gte: todayStart }
+            }
+          },
+          {
+            $group: {
+              _id: '$user_id',
+              todaySent: { $sum: '$delta_sent' },
+              todayReceived: { $sum: '$delta_received' }
+            }
+          }
+        ]).allowDiskUse(true);
+
+        todayUsage.forEach(u => {
+          usageMap[u._id] = (u.todaySent || 0) + (u.todayReceived || 0);
+        });
+      } catch (usageErr) {
+        console.error('Error fetching today usage for speed control:', usageErr);
+      }
+    }
+
+    // Merge usage_today into paged results
+    const pagedWithUsage = paged.map(u => ({
+      ...u,
+      usage_today_bytes: usageMap[u.user_id] || 0
+    }));
+
+    res.json({ total, throttledCount, data: pagedWithUsage });
   } catch (error) {
     console.error('Error fetching user throttles:', error);
     res.status(500).json({ error: 'Internal Server Error' });
