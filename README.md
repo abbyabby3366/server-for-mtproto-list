@@ -20,6 +20,8 @@ The server will run on `http://localhost:3000`.
 |--------|------|-------------|
 | `GET` | `/proxies` | Get list of available MTProto proxies |
 | `POST` | `/proxies` | Update proxy list (requires API_KEY) |
+| `GET` | `/web-proxies` | Get list of available SOCKS5 / HTTP web proxies |
+| `POST` | `/web-proxies` | Update web proxy list (requires API_KEY) |
 | `GET` | `/health` | Health check |
 | `GET` | `/` | Service info |
 

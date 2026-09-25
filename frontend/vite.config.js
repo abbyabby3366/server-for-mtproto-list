@@ -14,6 +14,10 @@ export default defineConfig({
         target: 'http://localhost:5005',
         changeOrigin: true,
       },
+      '/web-proxies': {
+        target: 'http://localhost:5005',
+        changeOrigin: true,
+      },
       '/transit-ips': {
         target: 'http://localhost:5005',
         changeOrigin: true,

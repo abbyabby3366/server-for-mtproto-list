@@ -114,6 +114,21 @@ const mtProxyConfigSchema = new mongoose.Schema({
 });
 const MtProxyConfig = mongoose.model('MtProxyConfig', mtProxyConfigSchema);
 
+const webProxyConfigSchema = new mongoose.Schema({
+  proxies: [
+    {
+      type: { type: String, default: 'socks5' },
+      host: { type: String, required: true },
+      port: { type: Number, required: true },
+      username: { type: String, default: '' },
+      password: { type: String, default: '' },
+      disabled: { type: Boolean, default: false }
+    }
+  ],
+  remarks: { type: String, default: '' }
+});
+const WebProxyConfig = mongoose.model('WebProxyConfig', webProxyConfigSchema);
+
 const externalRedirectConfigSchema = new mongoose.Schema({
   token: String,
   downloadUrl: String
@@ -153,6 +168,7 @@ module.exports = {
   ExternalRedirectLog,
   TransitIps,
   MtProxyConfig,
+  WebProxyConfig,
   ExternalRedirectConfig,
   UserThrottle,
   User

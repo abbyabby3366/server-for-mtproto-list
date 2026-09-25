@@ -8,6 +8,7 @@ import IosVersionConfigCard from '../components/Configs/IosVersionConfigCard';
 import ExternalRedirectsCard from '../components/Configs/ExternalRedirectsCard';
 import XrayNodeIpsCard from '../components/Configs/XrayNodeIpsCard';
 import MtProxiesCard from '../components/Configs/MtProxiesCard';
+import WebProxiesCard from '../components/Configs/WebProxiesCard';
 
 const Configs = () => {
   const { authFetch } = useAuth();
@@ -76,53 +77,25 @@ const Configs = () => {
   const [redirectLogsLoading, setRedirectLogsLoading] = useState(false);
   const [redirectLogsExpanded, setRedirectLogsExpanded] = useState(false);
 
-  // Load changelog history for Android App Versions
-  const fetchAndroidVersionLogs = async () => {
+  // Helper for loading changelog/activity history logs
+  const fetchLogsHelper = async (url, setLogs, setLoading) => {
     try {
-      setAndroidVersionLogsLoading(true);
-      const res = await authFetch('/api/android/version/logs');
+      setLoading(true);
+      const res = await authFetch(url);
       if (res.ok) {
         const data = await res.json();
-        setAndroidVersionLogs(data);
+        setLogs(data);
       }
     } catch (err) {
-      console.error('Error fetching Android version logs:', err);
+      console.error(`Error fetching ${url}:`, err);
     } finally {
-      setAndroidVersionLogsLoading(false);
+      setLoading(false);
     }
   };
 
-  // Load changelog history for iOS App Versions
-  const fetchIosVersionLogs = async () => {
-    try {
-      setIosVersionLogsLoading(true);
-      const res = await authFetch('/api/ios/version/logs');
-      if (res.ok) {
-        const data = await res.json();
-        setIosVersionLogs(data);
-      }
-    } catch (err) {
-      console.error('Error fetching iOS version logs:', err);
-    } finally {
-      setIosVersionLogsLoading(false);
-    }
-  };
-
-  // Load update activity logs for External Redirects
-  const fetchRedirectLogs = async () => {
-    try {
-      setRedirectLogsLoading(true);
-      const res = await authFetch('/api/external-redirects/logs');
-      if (res.ok) {
-        const data = await res.json();
-        setRedirectLogs(data);
-      }
-    } catch (err) {
-      console.error('Error fetching redirect logs:', err);
-    } finally {
-      setRedirectLogsLoading(false);
-    }
-  };
+  const fetchAndroidVersionLogs = () => fetchLogsHelper('/api/android/version/logs', setAndroidVersionLogs, setAndroidVersionLogsLoading);
+  const fetchIosVersionLogs = () => fetchLogsHelper('/api/ios/version/logs', setIosVersionLogs, setIosVersionLogsLoading);
+  const fetchRedirectLogs = () => fetchLogsHelper('/api/external-redirects/logs', setRedirectLogs, setRedirectLogsLoading);
 
   // Load configs and history logs on mount
   useEffect(() => {
@@ -614,6 +587,9 @@ const Configs = () => {
           t={t}
         />
       )}
+
+      {/* 5. WEB PROXIES */}
+      <WebProxiesCard />
 
     </div>
   );

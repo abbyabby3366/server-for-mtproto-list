@@ -123,6 +123,21 @@ const translations = {
   "Failed to save MT Proxies.": "保存 MT 代理失敗。",
   "Error saving MT Proxies.": "保存 MT 代理出錯。",
 
+  // Web Proxies
+  "Web Proxies": "Web 代理 (SOCKS5 / HTTP)",
+  "No Web Proxies configured. Click \"+ Add Web Proxy\" to get started.": "尚未配置 Web 代理。點擊「+ 新增 Web 代理」開始配置。",
+  "+ Add Web Proxy": "+ 新增 Web 代理",
+  "Save Web Proxies & Remarks": "保存 Web 代理與備註",
+  "Web Proxies & Remarks saved successfully!": "Web 代理與備註保存成功！",
+  "Failed to save Web Proxies.": "保存 Web 代理失敗。",
+  "Error saving Web Proxies.": "保存 Web 代理出錯。",
+  "Type": "類型",
+  "Username": "用戶名",
+  "Password": "密碼",
+  "Manage the list of SOCKS5 / HTTP web proxies served at": "管理 Web 代理列表 (SOCKS5 / HTTP)，提供於",
+  "Confirm Remove Web Proxy": "確認刪除 Web 代理",
+  "Are you sure you want to remove this web proxy?": "您確定要刪除此 Web 代理嗎？",
+
   // Analytics
   "TalkPro Telemetry - Analytics": "TalkPro 遙測 - 儀表盤",
   "Network Statistics": "網路統計",

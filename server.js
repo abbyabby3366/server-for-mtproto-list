@@ -1,4 +1,8 @@
 require('dotenv').config();
+const dns = require('dns');
+// Set public DNS servers to resolve MongoDB Atlas SRV records on Windows
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -24,7 +28,7 @@ mongoose.connect(MONGODB_URI, {
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Import Models
-const { User, MtProxyConfig, IosVersion } = require('./models');
+const { User, MtProxyConfig, WebProxyConfig, IosVersion } = require('./models');
 
 // Initialize default admin if no users exist
 mongoose.connection.once('open', async () => {
@@ -73,6 +77,22 @@ mongoose.connection.once('open', async () => {
   }
 });
 
+// Initialize default web proxies if collection is empty
+mongoose.connection.once('open', async () => {
+  try {
+    const count = await WebProxyConfig.countDocuments();
+    if (count === 0) {
+      await WebProxyConfig.create({
+        proxies: [],
+        remarks: ''
+      });
+      console.log('Initialized empty WebProxyConfig in DB');
+    }
+  } catch (err) {
+    console.error('Error initializing WebProxyConfig:', err);
+  }
+});
+
 // Initialize default iOS version config if collection is empty
 mongoose.connection.once('open', async () => {
   try {
@@ -107,10 +127,12 @@ app.get('/health', (req, res) => {
 const authRouter = require('./routes/auth');
 const configsRouter = require('./routes/configs');
 const telemetryRouter = require('./routes/telemetry');
+const webProxiesRouter = require('./routes/webProxies');
 
 app.use('/', authRouter);
 app.use('/', configsRouter);
 app.use('/', telemetryRouter);
+app.use('/', webProxiesRouter);
 
 // Wildcard handler directs all other GET requests to the index.html for client-side routing
 app.get('*', (req, res) => {
