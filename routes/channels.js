@@ -125,15 +125,14 @@ router.post('/api/channels', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/channels/sync-avatars - Auto-fetch Telegram avatars & upload to Linode S3
-const { extractTelegramHandle, uploadTelegramAvatarToS3 } = require('../services/s3Service');
+// POST /api/channels/sync-avatars - Auto-fetch Telegram info (title, description, avatar) & upload to Linode S3
+const { extractTelegramHandle, syncTelegramChannel } = require('../services/s3Service');
 
 router.post('/api/channels/sync-avatars', verifyToken, async (req, res) => {
   try {
-    const { force = false } = req.body || {};
     let config = await ChannelConfig.findOne();
     if (!config || !config.channels || config.channels.length === 0) {
-      return res.status(404).json({ error: 'No channels configured to sync avatars for' });
+      return res.status(404).json({ error: 'No channels configured to sync' });
     }
 
     let syncedCount = 0;
@@ -142,11 +141,6 @@ router.post('/api/channels/sync-avatars', verifyToken, async (req, res) => {
 
     for (let i = 0; i < config.channels.length; i++) {
       const channel = config.channels[i];
-      // Skip if already has avatar unless force is true
-      if (channel.avatar_url && !force) {
-        continue;
-      }
-
       const handle = extractTelegramHandle(channel.link);
       if (!handle) {
         failedCount++;
@@ -155,15 +149,26 @@ router.post('/api/channels/sync-avatars', verifyToken, async (req, res) => {
       }
 
       try {
-        console.log(`[Avatar Sync] Fetching avatar for @${handle} (${channel.title})...`);
-        const s3Url = await uploadTelegramAvatarToS3(handle);
-        config.channels[i].avatar_url = s3Url;
+        console.log(`[Channel Sync] Syncing @${handle} (${channel.title})...`);
+        const syncedData = await syncTelegramChannel(handle);
+
+        // Overwrite title and description from Telegram metadata
+        if (syncedData.title) {
+          config.channels[i].title = syncedData.title;
+        }
+        if (typeof syncedData.description === 'string') {
+          config.channels[i].description = syncedData.description;
+        }
+        if (syncedData.avatar_url) {
+          config.channels[i].avatar_url = syncedData.avatar_url;
+        }
+
         syncedCount++;
-        console.log(`[Avatar Sync] Successfully uploaded @${handle} -> ${s3Url}`);
+        console.log(`[Channel Sync] Successfully updated @${handle} (title: "${syncedData.title}")`);
       } catch (err) {
         failedCount++;
         errors.push({ title: channel.title, handle, error: err.message });
-        console.warn(`[Avatar Sync] Failed for @${handle}:`, err.message);
+        console.warn(`[Channel Sync] Failed for @${handle}:`, err.message);
       }
     }
 
@@ -177,12 +182,12 @@ router.post('/api/channels/sync-avatars', verifyToken, async (req, res) => {
       channels: config.channels
     });
   } catch (error) {
-    console.error('Error syncing channel avatars to S3:', error.message);
-    res.status(500).json({ error: 'Failed to sync avatars: ' + error.message });
+    console.error('Error syncing channels:', error.message);
+    res.status(500).json({ error: 'Failed to sync channels: ' + error.message });
   }
 });
 
-// POST /api/channels/sync-single-avatar - Sync avatar for a single channel link
+// POST /api/channels/sync-single-avatar - Sync title, description & avatar for a single channel link
 router.post('/api/channels/sync-single-avatar', verifyToken, async (req, res) => {
   try {
     const { link } = req.body;
@@ -191,11 +196,17 @@ router.post('/api/channels/sync-single-avatar', verifyToken, async (req, res) =>
       return res.status(400).json({ error: 'Invalid Telegram link or handle' });
     }
 
-    const s3Url = await uploadTelegramAvatarToS3(handle);
-    res.json({ status: 'success', avatar_url: s3Url, handle });
+    const syncedData = await syncTelegramChannel(handle);
+    res.json({
+      status: 'success',
+      handle,
+      title: syncedData.title,
+      description: syncedData.description,
+      avatar_url: syncedData.avatar_url
+    });
   } catch (error) {
-    console.error('Error syncing single avatar:', error.message);
-    res.status(500).json({ error: error.message || 'Failed to sync avatar' });
+    console.error('Error syncing single channel:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to sync channel' });
   }
 });
 

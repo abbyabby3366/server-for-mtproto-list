@@ -31,9 +31,31 @@ function extractTelegramHandle(link) {
 }
 
 /**
- * Scrape the public Telegram channel preview page to find the avatar image URL
+ * Decode common HTML entities from scraped web content
  */
-async function getTelegramAvatarUrl(handle) {
+function decodeHtmlEntities(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, dec) => {
+      try {
+        return String.fromCharCode(parseInt(dec, 10));
+      } catch {
+        return _;
+      }
+    })
+    .trim();
+}
+
+/**
+ * Scrape the public Telegram channel preview page to find metadata (title, description, image)
+ */
+async function getTelegramChannelInfo(handle) {
   try {
     const url = `https://t.me/${handle}`;
     const response = await fetch(url, {
@@ -43,38 +65,64 @@ async function getTelegramAvatarUrl(handle) {
     });
 
     if (!response.ok) {
-      console.warn(`[Avatar] Failed to fetch Telegram page for ${handle}: HTTP ${response.status}`);
+      console.warn(`[Telegram Scrape] Failed to fetch Telegram page for ${handle}: HTTP ${response.status}`);
       return null;
     }
 
     const html = await response.text();
 
-    // Look for og:image or twitter:image
-    const ogMatch = html.match(/property="og:image"\s+content="([^"]+)"/i) ||
-                    html.match(/name="twitter:image"\s+content="([^"]+)"/i);
-
-    if (ogMatch && ogMatch[1]) {
-      return ogMatch[1];
+    // Title
+    const ogTitle = html.match(/property="og:title"\s+content="([^"]*)"/i) ||
+                    html.match(/name="twitter:title"\s+content="([^"]*)"/i);
+    let title = '';
+    if (ogTitle && ogTitle[1]) {
+      const parsedTitle = decodeHtmlEntities(ogTitle[1]);
+      // Avoid placeholder "Telegram: Contact @handle"
+      if (!parsedTitle.toLowerCase().startsWith('telegram: contact @')) {
+        title = parsedTitle;
+      }
     }
 
-    return null;
+    // Description
+    const ogDesc = html.match(/property="og:description"\s+content="([^"]*)"/i) ||
+                   html.match(/name="twitter:description"\s+content="([^"]*)"/i);
+    const description = ogDesc && ogDesc[1] ? decodeHtmlEntities(ogDesc[1]) : '';
+
+    // Image
+    const ogImg = html.match(/property="og:image"\s+content="([^"]+)"/i) ||
+                  html.match(/name="twitter:image"\s+content="([^"]+)"/i);
+    let avatarUrl = null;
+    if (ogImg && ogImg[1]) {
+      // Exclude generic placeholder logo
+      if (!ogImg[1].includes('telegram.org/img/t_logo')) {
+        avatarUrl = ogImg[1];
+      }
+    }
+
+    return {
+      title,
+      description,
+      avatarUrl
+    };
   } catch (err) {
-    console.error(`[Avatar] Error scraping avatar for ${handle}:`, err.message);
+    console.error(`[Telegram Scrape] Error scraping channel info for ${handle}:`, err.message);
     return null;
   }
 }
 
 /**
- * Download image from Telegram and upload it to Linode S3 bucket
+ * Scrape the public Telegram channel preview page to find the avatar image URL (backward-compatible)
  */
-async function uploadTelegramAvatarToS3(handle) {
-  const telegramImgUrl = await getTelegramAvatarUrl(handle);
-  if (!telegramImgUrl) {
-    throw new Error(`Could not find profile image on Telegram for @${handle}`);
-  }
+async function getTelegramAvatarUrl(handle) {
+  const info = await getTelegramChannelInfo(handle);
+  return info ? info.avatarUrl : null;
+}
 
-  // Download image buffer
-  const imgRes = await fetch(telegramImgUrl);
+/**
+ * Upload an image URL to Linode S3 bucket
+ */
+async function uploadImageToS3(imageUrl, handle) {
+  const imgRes = await fetch(imageUrl);
   if (!imgRes.ok) {
     throw new Error(`Failed to download image from Telegram: HTTP ${imgRes.status}`);
   }
@@ -95,13 +143,51 @@ async function uploadTelegramAvatarToS3(handle) {
     ACL: 'public-read'
   }));
 
-  // Public URL using custom domain or Linode endpoint
   const publicUrl = `https://${BUCKET_NAME}/${key}`;
   return publicUrl;
 }
 
+/**
+ * Download image from Telegram and upload it to Linode S3 bucket
+ */
+async function uploadTelegramAvatarToS3(handle) {
+  const telegramImgUrl = await getTelegramAvatarUrl(handle);
+  if (!telegramImgUrl) {
+    throw new Error(`Could not find profile image on Telegram for @${handle}`);
+  }
+  return uploadImageToS3(telegramImgUrl, handle);
+}
+
+/**
+ * Sync entire channel info from Telegram: title, description, and S3 avatar
+ */
+async function syncTelegramChannel(handle) {
+  const info = await getTelegramChannelInfo(handle);
+  if (!info) {
+    throw new Error(`Failed to fetch Telegram details for @${handle}`);
+  }
+
+  let avatar_url = null;
+  if (info.avatarUrl) {
+    try {
+      avatar_url = await uploadImageToS3(info.avatarUrl, handle);
+    } catch (err) {
+      console.warn(`[Sync] Avatar upload to S3 failed for @${handle}:`, err.message);
+    }
+  }
+
+  return {
+    handle,
+    title: info.title,
+    description: info.description,
+    avatar_url
+  };
+}
+
 module.exports = {
   extractTelegramHandle,
+  getTelegramChannelInfo,
   getTelegramAvatarUrl,
-  uploadTelegramAvatarToS3
+  uploadTelegramAvatarToS3,
+  syncTelegramChannel
 };

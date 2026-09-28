@@ -131,10 +131,10 @@ const Channels = () => {
     }
   };
 
-  const handleSyncAllAvatars = async (force = false) => {
+  const handleSyncAllAvatars = async (force = true) => {
     try {
       setSyncingAvatars(true);
-      showNotification(t('Syncing to S3...'), 'info');
+      showNotification(t('Syncing channels from Telegram...'), 'info');
       const res = await authFetch('/api/channels/sync-avatars', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,15 +145,15 @@ const Channels = () => {
         const data = await res.json();
         setChannels(data.channels || []);
         showNotification(
-          `${t('Successfully synced avatars to Linode S3!')} (${data.syncedCount} synced, ${data.failedCount} failed)`,
+          `${t('Successfully synced channels!')} (${data.syncedCount} synced, ${data.failedCount} failed)`,
           'success'
         );
       } else {
         const errData = await res.json().catch(() => ({}));
-        showNotification(errData.error || t('Failed to sync avatars.'), 'error');
+        showNotification(errData.error || t('Failed to sync channels.'), 'error');
       }
     } catch (err) {
-      showNotification(t('Failed to sync avatars.') + ' ' + (err.message || ''), 'error');
+      showNotification(t('Failed to sync channels.') + ' ' + (err.message || ''), 'error');
     } finally {
       setSyncingAvatars(false);
     }
@@ -174,15 +174,20 @@ const Channels = () => {
       if (res.ok) {
         const data = await res.json();
         const updated = [...channels];
-        updated[index] = { ...updated[index], avatar_url: data.avatar_url };
+        updated[index] = {
+          ...updated[index],
+          ...(data.title ? { title: data.title } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.avatar_url ? { avatar_url: data.avatar_url } : {})
+        };
         setChannels(updated);
-        showNotification(`@${data.handle}: ${t('Successfully synced avatars to Linode S3!')}`, 'success');
+        showNotification(`@${data.handle}: ${t('Successfully synced channel info!')}`, 'success');
       } else {
         const errData = await res.json().catch(() => ({}));
-        showNotification(errData.error || t('Failed to sync avatars.'), 'error');
+        showNotification(errData.error || t('Failed to sync channel.'), 'error');
       }
     } catch (err) {
-      showNotification(t('Failed to sync avatars.') + ' ' + (err.message || ''), 'error');
+      showNotification(t('Failed to sync channel.') + ' ' + (err.message || ''), 'error');
     } finally {
       setSyncingSingleIndex(null);
     }
@@ -261,7 +266,7 @@ const Channels = () => {
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
-              onClick={() => handleSyncAllAvatars(false)}
+              onClick={() => handleSyncAllAvatars(true)}
               disabled={syncingAvatars}
               className="btn"
               style={{
@@ -277,10 +282,10 @@ const Channels = () => {
                 opacity: syncingAvatars ? 0.7 : 1,
                 fontWeight: 500
               }}
-              title="Automatically fetch Telegram profile pictures and upload to Linode S3"
+              title="Automatically fetch Telegram channel title, description, and avatar to Linode S3"
             >
               <CloudDownload size={16} />
-              <span>{syncingAvatars ? t('Syncing to S3...') : t('Auto-Sync Avatars to S3')}</span>
+              <span>{syncingAvatars ? t('Syncing channels...') : t('Auto-Sync Channels')}</span>
             </button>
             <button
               onClick={handleAddChannel}

@@ -175,7 +175,7 @@ const ChannelRow = ({
               type="button"
               onClick={() => onSyncSingle(originalIndex)}
               disabled={isSyncingSingle}
-              title="Fetch avatar from Telegram and upload to S3"
+              title="Fetch title, description, and avatar from Telegram and upload to S3"
               style={{
                 color: '#0284c7',
                 padding: '6px',
