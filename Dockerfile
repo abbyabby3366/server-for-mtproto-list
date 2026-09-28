@@ -29,6 +29,7 @@ RUN npm ci --only=production 2>/dev/null || npm install --only=production
 # Copy backend files and configurations
 COPY server.js models.js middleware.js ./
 COPY routes/ ./routes/
+COPY services/ ./services/
 COPY proxies.json* ./
 COPY transit-ips.json* ./
 COPY android-version.json* ./
