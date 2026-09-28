@@ -18,6 +18,10 @@ export default defineConfig({
         target: 'http://localhost:5005',
         changeOrigin: true,
       },
+      '/channels': {
+        target: 'http://localhost:5005',
+        changeOrigin: true,
+      },
       '/transit-ips': {
         target: 'http://localhost:5005',
         changeOrigin: true,

@@ -119,6 +119,27 @@ body {
   color: #0f172a;
 }
 
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  padding: 8px 10px 3px 10px;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background-color: #f1f5f9;
+  margin: 4px 8px;
+}
+
 .sidebar-footer {
   padding: 10px 8px;
   border-top: 1px solid #f1f5f9;

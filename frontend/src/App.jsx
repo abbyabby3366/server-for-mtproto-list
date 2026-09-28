@@ -14,6 +14,7 @@ import Configs from './pages/Configs';
 import Users from './pages/Users';
 import TrafficReport from './pages/TrafficReport';
 import SpeedControl from './pages/SpeedControl';
+import Channels from './pages/Channels';
 
 // A wrapper component for protecting routes
 const ProtectedRoute = ({ children }) => {
@@ -112,6 +113,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Configs />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/channels" 
+        element={
+          <ProtectedRoute>
+            <Channels />
           </ProtectedRoute>
         } 
       />

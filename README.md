@@ -22,6 +22,8 @@ The server will run on `http://localhost:3000`.
 | `POST` | `/proxies` | Update proxy list (requires API_KEY) |
 | `GET` | `/web-proxies` | Get list of available SOCKS5 / HTTP web proxies |
 | `POST` | `/web-proxies` | Update web proxy list (requires API_KEY) |
+| `GET` | `/channels` | Get list of Telegram channels (supports `?grouped=true`) |
+| `POST` | `/channels` | Update channels list (requires API_KEY) |
 | `GET` | `/health` | Health check |
 | `GET` | `/` | Service info |
 

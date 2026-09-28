@@ -157,6 +157,21 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+const channelConfigSchema = new mongoose.Schema({
+  channels: [
+    {
+      category: { type: String, default: 'General' },
+      title: { type: String, required: true },
+      link: { type: String, required: true },
+      avatar_url: { type: String, default: '' },
+      description: { type: String, default: '' },
+      disabled: { type: Boolean, default: false }
+    }
+  ],
+  remarks: { type: String, default: '' }
+});
+const ChannelConfig = mongoose.model('ChannelConfig', channelConfigSchema);
+
 module.exports = {
   LoginTelemetry,
   NetworkTelemetry,
@@ -171,5 +186,6 @@ module.exports = {
   WebProxyConfig,
   ExternalRedirectConfig,
   UserThrottle,
-  User
+  User,
+  ChannelConfig
 };

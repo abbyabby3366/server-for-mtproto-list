@@ -15,7 +15,9 @@ import {
   Menu,
   X,
   Smartphone,
-  Gauge
+  Gauge,
+  Radio,
+  AlertTriangle
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -24,6 +26,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [platform, setPlatform] = useState('android');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Fetch platform configuration
   useEffect(() => {
@@ -46,21 +49,33 @@ const Layout = ({ children }) => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
-  const menuItems = [
-    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { path: '/talkpro-users', label: 'TalkPro Users', icon: Users },
-    { path: '/speed-control', label: 'Speed Control', icon: Gauge },
-    { path: '/logins', label: 'Recent Logins', icon: LogIn },
-    { path: '/network', label: 'Network Usage', icon: Activity },
-    { path: '/traffic-report', label: 'Traffic Report', icon: TrendingUp },
-    ...(platform === 'android' ? [{ path: '/xray', label: 'Xray IP Stats', icon: Cpu }] : []),
-    { path: '/configs', label: 'App Config', icon: Sliders },
+  const navSections = [
+    {
+      title: 'Overview',
+      items: [
+        { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+        { path: '/talkpro-users', label: 'TalkPro Users', icon: Users },
+      ]
+    },
+    {
+      title: 'Traffic & Telemetry',
+      items: [
+        { path: '/speed-control', label: 'Speed Control', icon: Gauge },
+        { path: '/logins', label: 'Recent Logins', icon: LogIn },
+        { path: '/network', label: 'Network Usage', icon: Activity },
+        { path: '/traffic-report', label: 'Traffic Report', icon: TrendingUp },
+        ...(platform === 'android' ? [{ path: '/xray', label: 'Xray IP Stats', icon: Cpu }] : []),
+      ]
+    },
+    {
+      title: 'Configuration',
+      items: [
+        { path: '/channels', label: 'Channels', icon: Radio },
+        { path: '/configs', label: 'App Config', icon: Sliders },
+        ...(user && user.role === 'admin' ? [{ path: '/users', label: 'Users', icon: Users }] : []),
+      ]
+    }
   ];
-
-  // Admin users can access the Users tab
-  if (user && user.role === 'admin') {
-    menuItems.push({ path: '/users', label: 'Users', icon: Users });
-  }
 
   return (
     <div className="app-container">
@@ -114,19 +129,25 @@ const Layout = ({ children }) => {
         </div>
 
         <nav className="sidebar-menu">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-              >
-                <Icon size={18} />
-                <span>{t(item.label)}</span>
-              </NavLink>
-            );
-          })}
+          {navSections.map((section, sIdx) => (
+            <div key={section.title} className="sidebar-section">
+              {sIdx > 0 && <div className="sidebar-divider" />}
+              <span className="sidebar-section-header">{t(section.title)}</span>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                  >
+                    <Icon size={18} />
+                    <span>{t(item.label)}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
@@ -170,9 +191,9 @@ const Layout = ({ children }) => {
               <span>{lang === 'en' ? '中文' : 'EN'}</span>
             </button>
 
-            {/* Logout Button */}
+            {/* Logout Button with Confirmation Trigger */}
             <button
-              onClick={logout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="btn btn-danger"
               style={{ flex: 1, padding: '8px 10px', fontSize: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}
             >
@@ -182,6 +203,69 @@ const Layout = ({ children }) => {
           </div>
         </div>
       </aside>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              width: '90%',
+              maxWidth: '380px',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #e2e8f0'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ padding: '8px', backgroundColor: '#fef2f2', borderRadius: '50%', color: '#dc2626' }}>
+                <AlertTriangle size={24} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>
+                {t('Confirm Logout')}
+              </h3>
+            </div>
+            <p style={{ fontSize: '13px', color: '#475569', marginBottom: '20px' }}>
+              {t('Are you sure you want to log out of GrapeFruitTalk?')}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="btn btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  logout();
+                }}
+                className="btn btn-danger"
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                {t('Logout')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Panel Content wrapper */}
       <main className="main-content">
